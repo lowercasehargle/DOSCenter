@@ -1,0 +1,613 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)\r\n"
+    "LANGUAGE 9, 1\r\n"
+    "#pragma code_page(1252)\r\n"
+    "#include ""res\\DOSCenter.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""afxres.rc""         // Standard components\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "res\\DOSCenter.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 235, 55
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About DOSCenter"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDR_MAINFRAME,IDC_STATIC,11,17,20,20
+    LTEXT           "DOSCenter Version 1.0",IDC_STATIC,40,10,119,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2008",IDC_STATIC,40,25,119,8
+    DEFPUSHBUTTON   "OK",IDOK,178,7,50,16,WS_GROUP
+END
+
+IDD_DOSCENTER_DIALOG DIALOGEX 0, 0, 608, 391
+STYLE DS_SETFONT | WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "DOSCenter build 37.1"
+FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
+BEGIN
+    CONTROL         "",IDC_ZIPDETAILSLIST,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP,322,39,279,315
+    PUSHBUTTON      "Browse",IDC_ZIPFOLDERBROWSEBTN,8,12,30,17
+    CONTROL         "",IDC_LEFTSIDELIST,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP,6,39,313,315
+    CONTROL         "Auto scan zips against .dat file",IDC_AUTOSCAN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,39,11,110,10
+    LTEXT           "Zip folder",IDC_ZIPFOLDERTXT,7,2,524,8
+    CONTROL         "",IDC_SPLITTER1,"Static",SS_BLACKFRAME | NOT WS_VISIBLE,319,39,2,315
+    LTEXT           "",IDC_FILENAMETXT,8,30,525,8
+    CONTROL         "matching CRCs",IDC_HIDEMATCHES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,27,354,64,10
+    LTEXT           "Hide:",IDC_HIDETXT,8,354,18,8
+    CONTROL         "missing",IDC_HIDEMISSING,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,93,354,39,10
+    CONTROL         "unknown",IDC_HIDEUNKNOWN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,141,354,45,10
+    PUSHBUTTON      "Settings and Tools",IDC_SETTINGSBTN,533,7,68,14
+    CONTROL         "Recursive",IDC_RECURSIZESCAN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,39,20,48,10
+    CONTROL         "Use Ignore List",IDC_APPLYIGNORE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,364,63,10
+    CONTROL         "alternates",IDC_HIDEALTS,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_TABSTOP,189,354,47,10
+    CONTROL         "",IDC_LEFTSIDEDATLIST,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP,6,39,313,315,WS_EX_ACCEPTFILES
+    PUSHBUTTON      "DAT view",IDC_DATZIPFLIP,269,354,50,14
+    PUSHBUTTON      ".dat query",IDC_DATQUERY,304,370,50,14,NOT WS_VISIBLE
+END
+
+IDD_PROGRESS DIALOGEX 0, 0, 266, 68
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Progress..."
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "STOP",IDOK,7,7,50,14,NOT WS_VISIBLE
+    LTEXT           "Static",IDC_TOP_TEXT,7,21,258,8
+    LTEXT           "Static",IDC_BOT_TEXT,7,33,258,34
+    CONTROL         "",IDC_ANIMATE1,"SysAnimate32",ACS_CENTER | ACS_TRANSPARENT | WS_TABSTOP,141,7,50,40,WS_EX_TRANSPARENT
+END
+
+IDD_POPUPVIEWER DIALOGEX 0, 0, 352, 244
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+FONT 9, "Terminal", 400, 0, 0xFF
+BEGIN
+    EDITTEXT        IDC_POPUPVIEWTXT,7,32,336,205,ES_MULTILINE | ES_WANTRETURN | WS_VSCROLL | NOT WS_TABSTOP
+    DEFPUSHBUTTON   "Strings",IDC_STRINGS,306,2,37,14,NOT WS_TABSTOP
+    LTEXT           "Offset    x0 x1 x2 x3 x4 x5 x6 x7 - x8 x9 xA xB xC xD xE xF   ASCII",IDC_STATIC,9,22,311,8
+END
+
+IDD_NEWFILENAMEDLG DIALOGEX 0, 0, 288, 15
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "New Filename"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_NEWFILENAMETXT,0,0,263,15,ES_AUTOHSCROLL | ES_WANTRETURN
+    DEFPUSHBUTTON   "OK",IDOK,269,0,19,15
+END
+
+IDD_SETTINGSANDTOOLS DIALOGEX 0, 0, 314, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Settings and Tools"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,257,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,257,24,50,14
+    PUSHBUTTON      "Load .DAT",IDC_LOADDATFILE,11,19,50,14
+    CONTROL         "Re-load on startup",IDC_DATAUTOLOAD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,34,76,10
+    PUSHBUTTON      "Make a .dat file",IDC_MAKEADAT,95,60,60,14
+    PUSHBUTTON      "Browse",IDC_SCRATCHPADBROWSE,13,170,50,14
+    LTEXT           "Temporary scratch pad",IDC_STATIC,13,158,75,8
+    LTEXT           "Path",IDC_SCRATCHPATHTXT,65,172,209,8
+    LTEXT           "DOS Collection path (aka Home path)",IDC_STATIC,13,95,120,8
+    PUSHBUTTON      "Browse",IDC_SETDOSCOLLECTIONPATHBTN,13,106,50,14
+    LTEXT           "Path",IDC_DOSCOLLECTIONPATHTXT,65,110,209,8
+    PUSHBUTTON      "Ignore files configuration",IDC_SCORINGCFGBTN,13,205,89,14
+    EDITTEXT        IDC_MINRENAMESCORE_EDIT,183,206,23,14,ES_AUTOHSCROLL
+    LTEXT           "Minimum Score for auto zip file rename",IDC_STATIC,112,204,66,17
+    PUSHBUTTON      "Browse",IDC_DOSBOXBROWSE,13,137,50,14
+    LTEXT           "Set DOSBox folder - where zip files can be unzipped to for testing",IDC_STATIC,13,126,210,8
+    LTEXT           "Path",IDC_DOBOXPATHTXT,65,141,208,8
+    CONTROL         "Detailed file reporting",IDC_DETAILEDREPORTS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,100,249,85,10
+    PUSHBUTTON      ".DAT info",IDC_DATFILEINFO,71,19,38,14
+    GROUPBOX        ".DAT file stuff",IDC_STATIC,7,7,245,72
+    LTEXT           "Static",IDC_DATFILENAMETXT,12,47,213,8
+    GROUPBOX        "Paths",IDC_STATIC,7,84,299,105
+    GROUPBOX        "Ignore files",IDC_STATIC,7,193,299,37
+    PUSHBUTTON      "Generate have/miss report",IDC_MISSINGLIST,14,248,80,23,BS_MULTILINE
+    CONTROL         "Include list of perfect files",IDC_PERFECTSTOO,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,109,260,99,10
+    GROUPBOX        "Reports and scripts",IDC_STATIC,7,232,299,64
+    PUSHBUTTON      "List Configuration",IDC_HAVEMISSLISTCFG,221,248,75,14,NOT WS_VISIBLE
+    CONTROL         "Auto-add unknown files to database",IDC_AUTOADD,"Button",BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP,238,200,66,28
+    PUSHBUTTON      "mdb check",IDC_MDB_CHECK,14,277,50,14
+END
+
+IDD_HEXCOMPARE DIALOGEX 0, 0, 434, 121
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "File Comparison"
+FONT 9, "Terminal", 400, 0, 0xFF
+BEGIN
+    DEFPUSHBUTTON   "Next Dif",IDOK,377,81,50,14
+    PUSHBUTTON      "Quit",IDCANCEL,377,7,50,14
+    EDITTEXT        IDC_SRCDATA,7,20,318,33,ES_MULTILINE | ES_WANTRETURN | NOT WS_TABSTOP
+    LTEXT           "Offset    x0 x1 x2 x3 x4 x5 x6 x7 - x8 x9 xA xB xC xD xE xF   ASCII",IDC_STATIC,9,10,269,8
+    EDITTEXT        IDC_TGTDATA,7,72,318,33,ES_MULTILINE | ES_WANTRETURN | NOT WS_TABSTOP
+    LTEXT           "Static",IDC_HEXSRCFILENAMETXT,8,55,419,8
+    LTEXT           "Static",IDC_HEXTGTFILENAMETXT,8,107,419,8
+    PUSHBUTTON      "Prev Dif",IDC_PREVDIFBTN,377,30,50,14
+    PUSHBUTTON      "Dif Out",IDC_MAKEDIFBTN,328,82,34,14
+END
+
+IDD_DATFILEINFO DIALOGEX 0, 0, 331, 228
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION ".DAT file information"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    PUSHBUTTON      "OK",IDOK,274,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,274,24,50,14
+    EDITTEXT        IDC_DATTITLE,49,8,194,14,ES_AUTOHSCROLL
+    LTEXT           "Title:",IDC_STATIC,28,11,17,8
+    EDITTEXT        IDC_DATDESC,49,28,194,14,ES_AUTOHSCROLL
+    LTEXT           "Description:",IDC_STATIC,7,32,39,8
+    EDITTEXT        IDC_DATVERSION,49,48,103,14,ES_AUTOHSCROLL
+    LTEXT           "Version:",IDC_STATIC,16,51,27,8
+    EDITTEXT        IDC_DATAUTHOR,49,68,194,14,ES_AUTOHSCROLL
+    LTEXT           "Author:",IDC_STATIC,18,73,26,8
+    EDITTEXT        IDC_DATWEBSITE,49,89,194,14,ES_AUTOHSCROLL
+    LTEXT           "Website:",IDC_STATIC,15,93,30,8
+    EDITTEXT        IDC_DATCOMMENTS,49,109,195,101,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL
+    LTEXT           "Comments:",IDC_STATIC,8,113,37,8
+    CONTROL         "Recursive build",IDC_DATRECURSIVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,253,50,64,10
+    DEFPUSHBUTTON   "hidden",IDC_BUTTON1,267,129,28,14,NOT WS_VISIBLE
+    EDITTEXT        IDC_DATDATE,183,48,60,14,ES_AUTOHSCROLL
+    LTEXT           "Date:",IDC_STATIC,163,51,19,8
+    LTEXT           "Static",IDC_TOTALZIPSTXT,49,213,196,8,NOT WS_VISIBLE
+END
+
+IDD_SCORESETUPDLG DIALOGEX 0, 0, 248, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Scoring Options"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,191,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,191,24,50,14
+    CONTROL         "",IDC_IGNOREFILESLIST,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP,7,57,184,107
+    EDITTEXT        IDC_FILESIZEIGNORE,81,167,40,14,ES_AUTOHSCROLL
+    LTEXT           "bytes",IDC_STATIC,123,170,19,8
+    CONTROL         "Ignore files below",IDC_FILESIZEIGNOREENA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,169,73,10
+    LTEXT           "Add entries in the list to ignore/skip when scanning zips against the .DAT file.",IDC_STATIC,7,7,179,17
+    LTEXT           "Right click on the list below to add/modify/delete.  Settings are saved in DCignore.ini in your DOSCenter folder.",IDC_STATIC,7,25,182,24
+END
+
+IDD_IGNOREENTRY DIALOGEX 0, 0, 160, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Ignore List entry"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,103,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,103,24,50,14
+    EDITTEXT        IDC_DATABASEFILENAME,44,7,40,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_DATABASEEXT,44,24,40,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_DATABASESIZE,108,43,40,14,ES_AUTOHSCROLL | NOT WS_VISIBLE
+    EDITTEXT        IDC_DATABASECRC,44,41,40,14,ES_AUTOHSCROLL
+    LTEXT           "Filename:",IDC_STATIC,11,7,32,8
+    LTEXT           "Extension:",IDC_STATIC,8,26,35,8
+    LTEXT           "Size:",IDC_STATIC,90,45,16,8,NOT WS_VISIBLE
+    LTEXT           "CRC:",IDC_STATIC,25,44,18,8
+END
+
+IDD_POPUPVIEWTXTDLG DIALOGEX 0, 0, 342, 209
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "File view"
+FONT 9, "Terminal", 400, 0, 0xFF
+BEGIN
+    PUSHBUTTON      "Search",IDC_SEARCH,210,7,50,14
+    EDITTEXT        IDC_SEARCHDATA,268,7,67,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Close",IDCANCEL,129,7,50,14
+    EDITTEXT        IDC_POPUPVIEWERTXT,7,22,328,180,ES_MULTILINE | ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_HAVEMISSSETUP DIALOGEX 0, 0, 262, 250
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Have/Miss output list configuration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Toggle All",IDC_TOGLALL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,42,18,47,10
+    CONTROL         "19xx",IDC_SCAN19xx,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,46,32,10
+    CONTROL         "198x",IDC_SCAN198x,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,32,10
+    CONTROL         "1981",IDC_SCAN1981,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,76,32,10
+    CONTROL         "1982",IDC_SCAN1982,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,91,32,10
+    CONTROL         "1983",IDC_SCAN1983,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,106,32,10
+    CONTROL         "1984",IDC_SCAN1984,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,121,32,10
+    CONTROL         "1985",IDC_SCAN1985,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,136,32,10
+    CONTROL         "1986",IDC_SCAN1986,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,151,32,10
+    CONTROL         "1987",IDC_SCAN1987,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,166,32,10
+    CONTROL         "1988",IDC_SCAN1988,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,181,32,10
+    CONTROL         "1989",IDC_SCAN1989,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,196,32,10
+    CONTROL         "199x",IDC_SCAN199x,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,46,32,10
+    CONTROL         "1990",IDC_SCAN1990,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,61,32,10
+    CONTROL         "1991",IDC_SCAN1991,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,76,32,10
+    CONTROL         "1992",IDC_SCAN1992,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,91,32,10
+    CONTROL         "1993",IDC_SCAN1993,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,106,32,10
+    CONTROL         "1994",IDC_SCAN1994,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,121,32,10
+    CONTROL         "1995",IDC_SCAN1995,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,136,32,10
+    CONTROL         "1996",IDC_SCAN1996,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,151,32,10
+    CONTROL         "1997",IDC_SCAN1997,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,166,32,10
+    CONTROL         "1998",IDC_SCAN1998,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,181,32,10
+    CONTROL         "1999",IDC_SCAN1999,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,47,196,32,10
+    CONTROL         "2000",IDC_SCAN2000,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,46,32,10
+    CONTROL         "2001",IDC_SCAN2001,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,61,32,10
+    CONTROL         "2002",IDC_SCAN2002,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,76,32,10
+    CONTROL         "2003",IDC_SCAN2003,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,91,32,10
+    CONTROL         "2004",IDC_SCAN2004,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,106,32,10
+    CONTROL         "2005",IDC_SCAN2005,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,121,32,10
+    CONTROL         "2006",IDC_SCAN2006,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,136,32,10
+    CONTROL         "2007",IDC_SCAN2007,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,151,32,10
+    CONTROL         "2008",IDC_SCAN2008,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,166,32,10
+    CONTROL         "2009",IDC_SCAN2009,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,181,32,10
+    CONTROL         "2010",IDC_SCAN2010,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,91,196,32,10
+    CONTROL         "2011",IDC_SCAN2011,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,133,46,32,10
+    CONTROL         "2012",IDC_SCAN2012,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,133,61,32,10
+    CONTROL         "2013",IDC_SCAN2013,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,133,76,32,10
+    CONTROL         "2014",IDC_SCAN2014,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,133,91,32,10
+    CONTROL         "Windows",IDC_SCANWIN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,133,106,45,10
+    CONTROL         "Dupes",IDC_SCANDUPES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,133,121,36,10
+    DEFPUSHBUTTON   "OK",IDOK,205,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,205,24,50,14
+    LTEXT           "Check any year/category to include in any scan reports or FTP script",IDC_STATIC,19,215,229,19
+END
+
+IDD_DATQUERYDLG DIALOGEX 0, 0, 316, 185
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    PUSHBUTTON      "Close",IDCANCEL,259,164,50,14
+    EDITTEXT        IDC_ROMNAME,74,32,61,14,ES_AUTOHSCROLL
+    LTEXT           "Filename",IDC_STATIC,139,38,29,8
+    PUSHBUTTON      "Search",IDC_DATQSEARCH,199,38,50,14
+END
+
+IDD_FILEIDDIZEDITDLG DIALOGEX 0, 0, 316, 185
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "file_id.diz editor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Apply",IDOK,205,164,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,259,164,50,14
+    EDITTEXT        IDC_FILEIDDIZVIEWERTXT,0,0,309,149,ES_MULTILINE | ES_AUTOHSCROLL
+END
+
+IDD_LISTPICKDLG DIALOGEX 0, 0, 308, 225
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Database Update"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,251,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,251,24,50,14
+    CONTROL         "",IDC_PICKLISTSELECT,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP,7,20,236,198
+    LTEXT           "pick one!",IDC_YOUCANTSEEME,7,7,180,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904e4"
+        BEGIN
+            VALUE "CompanyName", "TODO: <Company name>"
+            VALUE "FileDescription", "TODO: <File description>"
+            VALUE "FileVersion", "1.0.0.1"
+            VALUE "InternalName", "DOSCenter.exe"
+            VALUE "LegalCopyright", "TODO: (c) <Company name>.  All rights reserved."
+            VALUE "OriginalFilename", "DOSCenter.exe"
+            VALUE "ProductName", "TODO: <Product name>"
+            VALUE "ProductVersion", "1.0.0.1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 228
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 48
+    END
+
+    IDD_DOSCENTER_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 601
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 384
+    END
+
+    IDD_POPUPVIEWER, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 343
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 237
+    END
+
+    IDD_SETTINGSANDTOOLS, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 307
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 296
+    END
+
+    IDD_HEXCOMPARE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 427
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 114
+    END
+
+    IDD_DATFILEINFO, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 324
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 221
+    END
+
+    IDD_SCORESETUPDLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 241
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 184
+    END
+
+    IDD_IGNOREENTRY, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 153
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 56
+    END
+
+    IDD_POPUPVIEWTXTDLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 335
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 202
+    END
+
+    IDD_HAVEMISSSETUP, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 255
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 243
+    END
+
+    IDD_DATQUERYDLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 309
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 178
+    END
+
+    IDD_FILEIDDIZEDITDLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 309
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 178
+    END
+
+    IDD_LISTPICKDLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 301
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 218
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MENU1 MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "Rename"
+        BEGIN
+            MENUITEM "Auto Rename Selected",        ID_RENAME_RENAMESELECTED
+            MENUITEM "Rename Manually",             ID_RENAME_RENAMEBYHAND
+            MENUITEM "Rename from clipboard",       ID__RENAMEFROMCLIPBOARD
+            MENUITEM "Forget",                      ID__RENAME_FORGET
+        END
+        MENUITEM "Delete",                      ID__DELETE
+        MENUITEM "Refresh",                     ID__REFRESH
+        MENUITEM "Scan",                        ID__SCAN
+        MENUITEM "Merge Selected",              ID__MERGE
+        POPUP "Move"
+        BEGIN
+            MENUITEM "Browse",                      ID_MOVE_BROWSE
+            MENUITEM "Home",                        ID_MOVE_HOME
+        END
+        MENUITEM "Unzip to DOSBox",             ID__UNZIPTOTEMP
+        MENUITEM "Commit",                      ID__COMMIT
+        MENUITEM "Fix Zipfile",                 ID__FIXZIPFILE, GRAYED
+    END
+END
+
+IDR_MENU2 MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "Export File Listing"
+        BEGIN
+            POPUP "To Clipboard"
+            BEGIN
+                MENUITEM "No color",                    ID_TOCLIPBOARD_NOCOLOR
+                MENUITEM "Color",                       ID_TOCLIPBOARD_COLOR
+            END
+            POPUP "To File"
+            BEGIN
+                MENUITEM "No Color",                    ID_TOFILE_NOCOLOR
+                MENUITEM "Color",                       ID_TOFILE_COLOR
+            END
+        END
+        MENUITEM "Add to database",             ID__ADDTODATABASE
+        MENUITEM "Add to .dat file",            ID__ADDTODATFILE
+        MENUITEM "View File",                   ID__VIEWFILE
+        MENUITEM "Compare",                     ID__COMPARE, INACTIVE
+        MENUITEM "Add to Ignore List",          ID__ADDTOIGNORELIST
+        POPUP "Zip commands"
+        BEGIN
+            MENUITEM "Delete from zip",             ID_ZIPCOMMANDS_DELETE
+            MENUITEM "Rename File",                 ID_ZIPCOMMANDS_RENAME
+            MENUITEM "Move Files Up",               ID_ZIPCOMMANDS_MOVEFILESUP
+            MENUITEM "Extract to zip",              ID_ZIPCOMMANDS_EXTRACTTOZIP
+            MENUITEM "Extract here",                ID_ZIPCOMMANDS_EXTRACTHERE
+        END
+        MENUITEM "File Info",                   ID__FILEINFO
+        MENUITEM "Add to spam",                 ID__ADDTOSPAM
+    END
+END
+
+IDR_MENU3 MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Delete",                      ID__IGNOREDELETE
+        MENUITEM "Modify",                      ID_IGNOREMODIFY
+        MENUITEM "New",                         ID__IGNORENEW
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDS_ABOUTBOX            "&About DOSCenter..."
+END
+
+STRINGTABLE
+BEGIN
+    ID__ADDTODATABASE       "Add zip file to internal data, but don't save it."
+    ID__ADDTODATFILE        "Add permanently to .dat file"
+END
+
+#endif    // English (United States) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#define _AFX_NO_SPLITTER_RESOURCES
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE 9, 1
+#pragma code_page(1252)
+#include "res\DOSCenter.rc2"  // non-Microsoft Visual C++ edited resources
+#include "afxres.rc"         // Standard components
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
