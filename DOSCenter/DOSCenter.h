@@ -34,9 +34,10 @@
 // these are inverted values as calculated here: http://www.drpeterjones.com/colorcalc/
 #define COLOR_HIDE L"0xffffffff"
 #define COLOR_RED L"0x0000ff"
+#define COLOR_MISSING_ELSEWHERE L"6600CC"
 #define COLOR_RED_IGNORED L"0x9999ff"
 #define COLOR_GREEN_PERFECT L"0x009900"
-#define COLOR_GREEN2 L"0x004000"			// CRC match, but filename is wrong
+#define COLOR_GREEN2 L"0x0040c0"			// CRC match, but filename is wrong
 #define COLOR_GREEN3 L"0x00c0c0"
 #define COLOR_GREEN4 L"0x00b0b0"
 #define COLOR_BLACK L"0x000000"
@@ -55,24 +56,14 @@
 
 #define TZIPPED 0x40000000
 
+#define IGNORELISTSIZE 400
 
 // CDOSCenterApp:
 // See DOSCenter.cpp for the implementation of this class
 //
 //#define NEW_STATUS_COLLISION 0x100
-#define COLLISION_COUNT_START_BIT 36
+//#define COLLISION_COUNT_START_BIT 36
 
-typedef struct _NEWROMINFO	// each file (ROM) inside the zip or a .dat entry
-{
-	CStringW name;			// ROM filename
-	unsigned int size;		// size of file
-	unsigned int date;		// upper 16=date, lower 16=time
-	unsigned int status;	// bitmask info, see below
-	unsigned int crc;		// 
-	unsigned int datPtr;	// pointer back to .dat file entry#
-//	unsigned int datOff;	// and the actual "file (" entry
-	unsigned int collsionCount;
-} NEWROMINFO;
 
 // master structure for the .dat file.  
 typedef struct _DATFILESTRUC
@@ -95,6 +86,7 @@ typedef struct _ROMENTRY	// each file (ROM) inside the zip or a .dat entry
 	unsigned int date;		// upper 16=date, lower 16=time
 	unsigned int status;	// bitmask info, see below
 	CStringW correctFilename; // .dat entry filename
+	int		infoData;		// for passing misc info around such as a pointer to another dat entry.
 //	bool alternate;			// if set then
 //	unsigned int crc2;		// this is valid (for pklited or lzexed file)
 } datEntry;
@@ -114,13 +106,24 @@ typedef struct _ZIPMERGE
 
 typedef struct _ZIPMAP // replace the above with this one.
 {
-	CString filename;		// top level filename
+	CStringW filename;		// top level filename
 	int		fileCount;		// # of files inside it
+	int		skippedFiles;	// files in this zip that are on the ignore list
+	int		skippedFilesSize; // total byte count of those files.
+	unsigned long long totalBytes;	// total size of uncompressed data
 	int		zipDatPtr;		// pointer back to the .dat entry
 	std::map<CStringW, _ROMENTRY> ROMmap;	// storage, make the filename the key
 	std::map<CStringW, _ROMENTRY>::const_iterator it;	// an iterator
 } ZIPMAP;
 
+// for every rom in the .dat file, record the CRC of it so we can then look up the dat entry from the CRC when scanning an incoming zip
+// the key is the CRC32, the data stored there is this:
+typedef struct _DATCRCMAP
+{
+	unsigned int	collisionCount;
+	unsigned int	filenameHash;
+	std::vector<unsigned int> datPtr;
+} DATCRCMAP;
 
 typedef struct _BESTHITS
 { // hey dumbass.  if you change any of these, make sure you change sortResults() too!
@@ -148,18 +151,21 @@ typedef struct _BESTHITS2
 //	unsigned int		crcMatch;	// # of CRC matches but filename mismatches
 	//unsigned int		dupes;		// # of CRC matches that are also in other .dat entries (not useful, but not damaging to the score)
 	unsigned int		datCount;	// # of files from the dat for this top ten hit
-	unsigned int		datSizeCount;	// number of bytes in this entry in the .dat
+	unsigned long long	datSizeCount;	// number of bytes in this entry in the .dat
 	unsigned int		matchCount; //
-	unsigned int		byteMatchCount; // number of bytes in this zip which match an entry in the .dat
+	unsigned long long	byteMatchCount; // number of bytes in this zip which match an entry in the .dat
 } BESTHITS2;
 
 
+// things we are ignoring.  this is only for display and user editing
 typedef struct _IGNOREFILE
 {
-	CString filename;
-	CString ext;
-	unsigned int crc;
+	CString filename;	// full filename
+	CString ext;		// or just an extension
+	CString scrc;		// specific CRC.  populate with -1 for *
 } IGNOREFILE;
+
+
 /*
 typedef struct _FILESTRUC	// each .dat file entry, contains all the files inside the zip
 {
@@ -250,13 +256,13 @@ public:
 	unsigned int m_datfileCount;	// for info only, # of zips inthe loaded .dat file
 	unsigned int m_datROMCount;		// " " " # of roms in the zips in the dat loaded
 	unsigned int m_romCountMDB;		// number of zips in mdb
+	unsigned int m_totalCollisions;
 	bool m_DATfileLoaded;
 	bool m_MDBfileLoaded;
 	bool m_autoLoadDat;
 	bool m_reloadIgnore;
 	bool m_ignoreOn;
 	bool m_recursiveScan;
-	unsigned int m_minFilesize;
 	CString m_currentlyTaggedZipFile;
 	CSortListCtrl m_zipDetailsList;
 	CSortListCtrl m_leftSideList;
@@ -267,7 +273,7 @@ public:
 	CString m_dosboxPath;
 	CString g_appPath;
 	CString m_defaultMovePath;
-	_IGNOREFILE m_ignoreThese[400];
+	_IGNOREFILE m_ignoreThese[IGNORELISTSIZE];
 
 
 	CString m_datName;
@@ -278,8 +284,9 @@ public:
 	CString m_datComment;
 	CString m_datAuthor;
 
-	DATFILESTRUC m_datMap;		// the main dat file map (global)
+	DATFILESTRUC m_datMap;		// the main dat file map (global)  This is a flat representation of the .dat file.
 	ZIPMAP* m_zipMap;
+
 
 	int m_ignoreTheseCount;
 	CString m_ignoreFileData;
@@ -312,17 +319,24 @@ public:
 	std::unordered_map <unsigned int, ZIPdata >::iterator m_datZipListit;
 	int m_nFileCount;
 	
+	// global map of all CRCs loaded from the .dat file.  
+	std::map <unsigned long long, DATCRCMAP> m_crcMap;
+
+	// global map of ignore pieces. we use 4 separate maps for quick lookups: filename.ext, filename.*, *.ext and crc
+	std::map <CStringW, unsigned int> m_ignoreFilename;
+//	std::map <CStringW, unsigned int>::const_iterator ignoreFit;
+	std::map <CStringW, unsigned int> m_ignoreExt;
+//	std::map <CStringW, unsigned int>::const_iterator ignoreEit;
+	std::map <CStringW, unsigned int> m_ignoreName;
+//	std::map <CStringW, unsigned int>::const_iterator ignoreNit;
+//	std::map <unsigned int, unsigned int> m_ignoreCRC;
+//	std::map <unsigned int, unsigned int>::const_iterator ignoreCit;
+	unsigned int m_ignoreMinFileSize;
+
 	// a globlal, but temporary storage item
 	std::map <unsigned int, ROMdata > m_tmpzipList; // temporary storage for pulling things out of the cmap when looking inside a zip
 	// this is another attempt at the above
-	CMap< CString, LPCWSTR,	  int,      int& > m_ROMsInZip;	
-
-	// would this work instead?
-	// need to set ROMdata but have the filename drive the key/lookup so it can be found quickly.
-	// clearing the map may take longer than simply overwriting existing contents and looping
-	// through trying to find the element.
-	//std::map <std::string, int > m_ROMsInZip2; // temporary storage for pulling things out of the cmap when looking inside a zip
-
+	CMap< CString, LPCWSTR,	  int,      int& > m_ROMsInZip;	//can go away when zip2map is replaced by zip2map2
 
 
 	///////////////////////////////////// database stuff ///////////////////////////
@@ -338,6 +352,7 @@ public:
 	CMap< CStringW, LPCWSTR, ZipInfoMDB, ZipInfoMDB& > m_ZIPDATEntryNameMDB;
 
 	CStringW extractFilenameWOPath(CStringW filename);
+	CStringW extractPathFromFilename(CStringW filename);
 	DECLARE_MESSAGE_MAP()
 };
 

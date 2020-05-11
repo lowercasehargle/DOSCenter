@@ -123,6 +123,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="adAssassinDlg.cpp" />
     <ClCompile Include="DatabaseEntryDlg.cpp" />
     <ClCompile Include="DATFileInfoDlg.cpp" />
     <ClCompile Include="datQueryDlg.cpp" />
@@ -153,6 +154,7 @@
     <ClCompile Include="Similar.cpp" />
     <ClCompile Include="SortHeaderCtrl.cpp" />
     <ClCompile Include="SortListCtrl.cpp" />
+    <ClCompile Include="SpamPopupViewer.cpp" />
     <ClCompile Include="SplitterControl.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -174,6 +176,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="adAssassinDlg.h" />
     <ClInclude Include="DatabaseEntryDlg.h" />
     <ClInclude Include="DATFileInfoDlg.h" />
     <ClInclude Include="datQueryDlg.h" />
@@ -200,6 +203,7 @@
     <ClInclude Include="Similar.h" />
     <ClInclude Include="SortHeaderCtrl.h" />
     <ClInclude Include="SortListCtrl.h" />
+    <ClInclude Include="SpamPopupViewer.h" />
     <ClInclude Include="SplitterControl.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="stringx.h" />

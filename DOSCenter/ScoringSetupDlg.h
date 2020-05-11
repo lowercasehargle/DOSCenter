@@ -26,6 +26,9 @@ public:
 	afx_msg void OnBnClickedOk();
 	//void populateList(CString data);
 	void populateIgnoreList();
+	void addEntry2ignorelist(CString filename, CString ext, CString scrc);
+	int prepIgnoreListForSave();
+	void saveIgnoreList();
 	CEdit m_fileSizeIgnoreEdit;
 	afx_msg void OnBnClickedFilesizeignoreena();
 

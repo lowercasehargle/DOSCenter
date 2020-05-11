@@ -7,6 +7,7 @@
 #include "fileStuff.h"
 #include "DatabaseEntryDlg.h"
 #include ".\scoringsetupdlg.h"
+#include <string>
 
 // CScoringSetupDlg dialog
 
@@ -44,51 +45,78 @@ BOOL CScoringSetupDlg::OnInitDialog()
 	m_ignoreList.DeleteAllItems();
 	theApp.m_reloadIgnore = false;
 
-	// populate the list
+	// populate the dialog list from the array.
 	for (int i=0; i<theApp.m_ignoreTheseCount; i++)
 	{
-		txt.Format(L"0x%x",theApp.m_ignoreThese[i].crc);
-		if (theApp.m_ignoreThese[i].crc == 0xffffffff)
-			txt = "*";
-		m_ignoreList.AddItem(COLOR_BLACK, theApp.m_ignoreThese[i].filename, theApp.m_ignoreThese[i].ext, txt);
+		m_ignoreList.AddItem(COLOR_BLACK, theApp.m_ignoreThese[i].filename, theApp.m_ignoreThese[i].ext, theApp.m_ignoreThese[i].scrc);
 	}
 	((CButton*)GetDlgItem(IDC_FILESIZEIGNOREENA))->SetCheck(1);	
-	if (theApp.m_minFilesize == -1)
+	if (theApp.m_ignoreMinFileSize == -1)
 		((CButton*)GetDlgItem(IDC_FILESIZEIGNOREENA))->SetCheck(0);
 
-	txt.Format(L"%d", theApp.m_minFilesize);
+	txt.Format(L"%d", theApp.m_ignoreMinFileSize);
+
 	m_fileSizeIgnoreEdit.SetWindowText(txt);
 	OnBnClickedFilesizeignoreena();
 	return TRUE;  // return TRUE  unless you set the focus to a control
-
 }
 // CScoringSetupDlg message handlers
 
 void CScoringSetupDlg::OnBnClickedOk()
 {
-	CFileStuff fileStuff;
-	CString txt, line, newline;
-	int pos, pos2;
-	FILE* outFile;
-	CString fileData;
+	CString txt;
 
 	// save entries from the list and re-write the file
 	txt = "-1";	// assume checkbox is set
 	if ( ((CButton*)GetDlgItem(IDC_FILESIZEIGNOREENA))->GetCheck())
 	{
 		m_fileSizeIgnoreEdit.GetWindowText(txt);
-		swscanf_s(txt, L"%d",&theApp.m_minFilesize); 
+		swscanf_s(txt, L"%d", &theApp.m_ignoreMinFileSize);
 	}
-	
-	pos = theApp.m_ignoreFileData.Find(L"min_filesize = ");
-	if (pos == -1)
+
+	// convert the dialog list back to the array.
+	theApp.m_ignoreTheseCount = 0;
+	while (m_ignoreList.GetItemText(theApp.m_ignoreTheseCount, 1) != L"")
+	{
+		CString f = m_ignoreList.GetItemText(theApp.m_ignoreTheseCount, 1);	// filename
+		CString e = m_ignoreList.GetItemText(theApp.m_ignoreTheseCount, 2);	// ext
+		//	theApp.m_ignoreFileData +=m_ignoreList.GetItemText(count,3)+", ";	// size
+		txt = m_ignoreList.GetItemText(theApp.m_ignoreTheseCount, 3);	// crc
+		if (txt.GetLength() == 0)
+			txt = L"*";
+		theApp.m_ignoreThese[theApp.m_ignoreTheseCount].filename = f;
+		theApp.m_ignoreThese[theApp.m_ignoreTheseCount].ext = e;
+		theApp.m_ignoreThese[theApp.m_ignoreTheseCount].scrc = txt;
+		theApp.m_ignoreTheseCount++;
+	}
+
+	int ret = prepIgnoreListForSave();
+	if (ret == -1)
 	{
 		AfxMessageBox(L"Failed to open DCIgnore.ini!  Should be in the same path as DOSCenter.exe.", MB_ICONEXCLAMATION, 0);
 		OnOK();
 		return;
 	}
+	saveIgnoreList();
+
+	theApp.m_reloadIgnore = true;
+	OnOK();
+}
+
+// pulls the current ignore list into a buffer for saving.
+// if there was an error, returns -1
+int CScoringSetupDlg::prepIgnoreListForSave()
+{
+	int pos, pos2;
+	CString txt, line, newline;
+	CString filename, ext, scrc;
+
+	pos = theApp.m_ignoreFileData.Find(L"min_filesize = ");
+	if (pos == -1)
+		return - 1;
 	pos2 = theApp.m_ignoreFileData.Find(L"\n", pos);
-	line = theApp.m_ignoreFileData.Mid(pos, pos2-pos );
+	line = theApp.m_ignoreFileData.Mid(pos, pos2 - pos);
+	txt.Format(L"%d", theApp.m_ignoreMinFileSize);
 	newline = L"\nmin_filesize = " + txt + L"\n";
 	theApp.m_ignoreFileData.Replace(line, newline);
 
@@ -97,29 +125,40 @@ void CScoringSetupDlg::OnBnClickedOk()
 	pos += newline.GetLength();
 	theApp.m_ignoreFileData.Truncate(pos);
 
-
-	//theApp.m_ignoreFileData.Replace("\n","\r\n");
-	int count=0;
-	while (	m_ignoreList.GetItemText(count,1) != L"")
-		{
-			theApp.m_ignoreFileData +=m_ignoreList.GetItemText(count,1)+L", ";	// filename
-			theApp.m_ignoreFileData +=m_ignoreList.GetItemText(count,2)+L", ";	// ext
-		//	theApp.m_ignoreFileData +=m_ignoreList.GetItemText(count,3)+", ";	// size
-			txt = m_ignoreList.GetItemText(count,3)+L" ";	// crc
-			if (txt.GetLength() == 0) 
-				txt = L"*";
-			theApp.m_ignoreFileData +=txt;
-			theApp.m_ignoreFileData +=L"\n";
-			count++;
-		}
-	
-	CString outName = theApp.g_appPath+L"\\DCignore.ini";
+	for (int i = 0; i < theApp.m_ignoreTheseCount; i++)
+	{
+		filename = theApp.m_ignoreThese[i].filename;
+		ext = theApp.m_ignoreThese[i].ext;
+		scrc = theApp.m_ignoreThese[i].scrc;
+		
+		theApp.m_ignoreFileData += filename + L",";
+		theApp.m_ignoreFileData += ext + L",";
+		theApp.m_ignoreFileData += scrc + L"\n";
+	}
 	theApp.m_ignoreFileData.Replace(L"\n", L"\r\n");
-	outFile = fopen((CT2A)outName,"wb");
-	fwrite((CT2A)theApp.m_ignoreFileData, sizeof( char ), theApp.m_ignoreFileData.GetLength(), outFile );
+	return 0;
+}
+// writes the contents of the current ignore list to a file.
+void CScoringSetupDlg::saveIgnoreList()
+{
+	CFileStuff fileStuff;
+	FILE* outFile;
+	CString fileData;
+	errno_t err;
+
+	// write the entire ignore file.  first copy it into a normal character buffer because this is not using unicode.
+	std::string buffer = CT2A(theApp.m_ignoreFileData);
+	CString outName = theApp.g_appPath + L"\\DCignore.ini";
+	outFile = fopen(theApp.g_appPath + "\\DCignore.ini", "wb");
+
+	if (outFile == NULL)
+	{
+		AfxMessageBox(L"Failed to write DCIgnore.ini!  Whatcha doin' to me?", MB_ICONEXCLAMATION, 0);
+		OnOK();
+		return;
+	}
+	fwrite(&buffer[0], sizeof(char), strlen(&buffer[0]), outFile);
 	fclose(outFile);
-	theApp.m_reloadIgnore = true;
-	OnOK();
 }
 void CScoringSetupDlg::populateIgnoreList()
 {
@@ -128,7 +167,8 @@ void CScoringSetupDlg::populateIgnoreList()
 	FILE* inFile;
 	CString data;
 	CString line;
-	CString filename, ext, crc;
+	CString filename, ext, scrc;
+	
 	int pos;
 
 	fopen_s(&inFile, theApp.g_appPath + "\\DCignore.ini", "r");
@@ -137,21 +177,26 @@ void CScoringSetupDlg::populateIgnoreList()
 		AfxMessageBox(L"Failed to open DCIgnore.ini!  Should be in the same path as DOSCenter.exe.", MB_ICONEXCLAMATION, 0);
 		return;
 	}
-
-	fileStuff.loadFile(inFile, theApp.m_ignoreFileData);
-
+	fileStuff.loadFile(inFile, data);
 	// close input file
 	fclose(inFile);
 
 
 
-	data = theApp.m_ignoreFileData;
+	// keep a full copy for if the table is accessed via dialog
+	theApp.m_ignoreFileData = data;
+
+	theApp.m_ignoreName.clear();
+	theApp.m_ignoreExt.clear();
+	theApp.m_ignoreFilename.clear();
+	theApp.m_ignoreTheseCount = 0;
+
 	data.Replace(L"\n\r", L"\r");
 	data.Replace(L"\r\n", L"\r");
 	data.Replace(L"\r", L"\n");
 	data += L"\n";
 
-	theApp.m_ignoreTheseCount = 0;
+	// parse the list
 	for (int i = 0; i<data.GetLength(); i++)
 	{
 		pos = data.Find(L"\n", i);
@@ -170,7 +215,7 @@ void CScoringSetupDlg::populateIgnoreList()
 		if (pos != -1)
 		{
 			line.TrimLeft(L"min_filesize = ");
-			swscanf_s(line, L"%d", &theApp.m_minFilesize);
+			swscanf_s(line, L"%d", &theApp.m_ignoreMinFileSize);
 			continue;
 		}
 		// must be an entry
@@ -182,30 +227,51 @@ void CScoringSetupDlg::populateIgnoreList()
 		line.TrimLeft(ext);
 		line.TrimLeft(L",");
 
-		//		size = line.Left(line.Find(","));
-		//		line.TrimLeft(size);
-		//		line.TrimLeft(",");
-
-		crc = line;
-
+		scrc = line;
 
 		filename.Trim();
 		ext.Trim();
-		//		size.Trim();
-		crc.Trim();
+		scrc.Trim();
 
-		if (crc == "*")
-			crc = "0xffffffff";
 
-		swscanf_s(crc, L"%x", &theApp.m_ignoreThese[theApp.m_ignoreTheseCount].crc);
-		//		sscanf( size, "%x",&theApp.m_ignoreThese[theApp.m_ignoreTheseCount].size); 
-		theApp.m_ignoreThese[theApp.m_ignoreTheseCount].filename = filename;
-		theApp.m_ignoreThese[theApp.m_ignoreTheseCount].ext = ext;
-		theApp.m_ignoreTheseCount++;
+		addEntry2ignorelist(filename, ext, scrc);
 
-		//		theApp.m_ignoreList.AddItem(COLOR_BLACK,filename, ext, size, crc);
-	}
+	}	//while parsing data
 }
+
+// add an entry to the existing ignore list
+void CScoringSetupDlg::addEntry2ignorelist(CString filename, CString ext, CString scrc)
+{
+	CString fullfilename;
+	unsigned int crc;
+	// save to the internal array.
+	theApp.m_ignoreThese[theApp.m_ignoreTheseCount].filename = filename;
+	theApp.m_ignoreThese[theApp.m_ignoreTheseCount].ext = ext;
+	theApp.m_ignoreThese[theApp.m_ignoreTheseCount].scrc = scrc;
+	theApp.m_ignoreTheseCount++;
+
+	if (scrc == "*")
+		scrc = "0xffffffff";
+
+	swscanf_s(scrc, L"%x", &crc);
+	// put each entry into the correct map
+	if ((filename == L"*") && (ext == L"*"))	// specific CRC 
+	{
+		AfxMessageBox(L"Invalid (dangerous) entry in ignore file.\r\nFilename of *.* detected.", MB_ICONEXCLAMATION, 0);
+	}
+
+	filename.MakeLower();
+	ext.MakeLower();
+	fullfilename = filename + L"." + ext;
+
+	if ((filename != L"*") && (ext == L"*"))	// any filename.* 
+		theApp.m_ignoreName[filename] = crc;
+	if ((filename == L"*") && (ext != L"*"))	// any *.ext
+		theApp.m_ignoreExt[ext] = crc;
+	if ((filename != L"*") && (ext != L"*"))	// specific filename
+		theApp.m_ignoreFilename[fullfilename] = crc;
+}
+
 
 void CScoringSetupDlg::OnNMRclickList(NMHDR *pNMHDR, LRESULT *pResult)
 {

@@ -23,6 +23,9 @@
 #define IDD_DATQUERYDLG                 141
 #define IDD_FILEIDDIZEDITDLG            142
 #define IDD_LISTPICKDLG                 143
+#define IDD_ADASSASSIN                  144
+#define IDD_POPUPVIEWTXTDLG1            145
+#define IDD_QUICKVIEWPOPUPDLG           145
 #define IDC_LEFTSIDELIST                1000
 #define IDC_ZIPDETAILSLIST              1001
 #define IDC_ZIPFOLDERBROWSEBTN          1002
@@ -133,6 +136,7 @@
 #define IDC_TOTALROMSTXT                1098
 #define IDC_BUTTON3                     1102
 #define IDC_DATZIPFLIP                  1102
+#define IDC_SPAMASS_TRAINHAM_BTN        1102
 #define IDC_DATZIPFLIP2                 1103
 #define IDC_PROCESSMODE                 1103
 #define IDC_HAVEMISSLISTCFG             1105
@@ -143,8 +147,19 @@
 #define IDC_DATQSEARCH                  1110
 #define IDC_BUTTON2                     1111
 #define IDC_MDB_CHECK                   1111
+#define IDC_SPAMASS_TRAINSPAM_BTN       1111
 #define IDC_FILEIDDIZVIEWERTXT          1112
 #define IDC_PICKLISTSELECT              1113
+#define IDC_AD_ASSASSIN_BTN             1115
+#define IDC_SPAMASS_LOADBTN             1116
+#define IDC_SPAMASSBROWSEBUTTON4        1117
+#define IDC_SPAMASS_GO                  1118
+#define IDC_SPAMASS_ZIPPATH             1119
+#define IDC_SPAMASSTEXT                 1120
+#define IDC_ADASSNAMETXT                1121
+#define IDC_NOTSPAM                     1122
+#define IDC_YESSPAM                     1123
+#define IDC_SPAM_UNCLE                  1124
 #define IDC_PROGRESS1                   2000
 #define IDC_ANIMATE1                    2001
 #define IDC_TOP_TEXT                    2003
@@ -195,9 +210,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        143
+#define _APS_NEXT_RESOURCE_VALUE        145
 #define _APS_NEXT_COMMAND_VALUE         32819
-#define _APS_NEXT_CONTROL_VALUE         1115
+#define _APS_NEXT_CONTROL_VALUE         1125
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

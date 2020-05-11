@@ -40,7 +40,7 @@ public:
 	void OnBnClickedLoadMDBfile();
 	bool m_autoadd;
 	unsigned int String2Date(CString datetime);
-	void rom2datmap(CStringW name, unsigned int size, int status, bool found, unsigned int date, CString scrc, unsigned int ptr2zip, int romCount);
+	bool rom2datmap(CStringW name, unsigned int size, int status, bool found, unsigned int date, CString scrc, int romCount);
 	bool m_recursive;
 	bool m_cmdLine;
 
@@ -81,5 +81,7 @@ public:
 	void makeLists();
 	afx_msg void OnBnClickedMdbCheck();
 	unsigned int hashAString(char *str, unsigned int hval);
+	bool is_utf8(const char* string);
+	afx_msg void OnBnClickedAdAssassinBtn();
 };
 

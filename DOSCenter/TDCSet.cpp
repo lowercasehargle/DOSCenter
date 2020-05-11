@@ -58,10 +58,11 @@ CTDCSet::CTDCSet(CDatabase* pdb)
 	m_Croatian = FALSE;
 	m_Brazilian = FALSE;
 	m_Estonian = FALSE;
+	m_Persian = FALSE;
 	m_mobyURL = L"";
 
 
-	m_nFields = 44;	// hey dumbass, don't forget to change this if you alter any of the above!!
+	m_nFields = 45;	// hey dumbass, don't forget to change this if you alter any of the above!!
 	m_nDefaultType = dynaset;
 }
 //#error Security Issue: The connection string may contain a password
@@ -133,6 +134,7 @@ void CTDCSet::DoFieldExchange(CFieldExchange* pFX)
 	RFX_Bool(pFX, _T("[Croatian]"), m_Croatian);
 	RFX_Bool(pFX, _T("[Brazilian]"), m_Brazilian);
 	RFX_Bool(pFX, _T("[Estonian]"), m_Estonian);
+	RFX_Bool(pFX, _T("[Persian]"), m_Persian);
 	
 	RFX_Text(pFX, _T("[mobyURL]"), m_mobyURL);
 

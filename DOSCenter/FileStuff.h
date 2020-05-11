@@ -25,6 +25,7 @@ fpos_t m_filePos;
 	bool getDATHeader(FILE* pinputFile, CString &header);
 	bool setTimestamp(CString filepath, unsigned int timestamp);
 	BOOL setTimestampFolder(CString filepath, unsigned int timestamp);
+	unsigned long long getTimestamp(CStringW filename);
 protected:
 	BOOL IsDots(const TCHAR* str);
 };

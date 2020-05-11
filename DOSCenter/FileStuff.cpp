@@ -447,6 +447,22 @@ BOOL CFileStuff::IsDots(const TCHAR* str)
    return TRUE;
 }
 
+// get a file/folder timestamp.
+unsigned long long CFileStuff::getTimestamp(CStringW filename)
+{
+	CFileStatus fileStatus;
+	unsigned long long timestamp;
+	SYSTEMTIME t;
+	FILETIME ftCreate;
+
+	CFile::GetStatus(filename, fileStatus);
+	fileStatus.m_mtime.GetAsSystemTime(t);
+	SystemTimeToFileTime(&t, &ftCreate);
+	timestamp = (unsigned long long)ftCreate.dwHighDateTime << 32;
+	timestamp += ftCreate.dwLowDateTime;
+	return timestamp;
+}
+
 // set a given timestamp to a file
 bool CFileStuff::setTimestamp(CString filepath, unsigned int timestamp)
 {

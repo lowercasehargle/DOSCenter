@@ -4,7 +4,7 @@
 #include "stdafx.h"
 #include "DOSCenter.h"
 #include "dizInfo.h"
-
+#include "settingsandTools.h"
 
 // CdizInfo
 
@@ -31,6 +31,7 @@ bool CdizInfo::setLangTags(CStringW &dizname, CString &language, bool silent, di
 	// languages
 	// using the language table here: http://www.lingoes.net/en/translator/langcode.htm
 	int pos;
+	CSettingsandTools snt;
 	CString tmp;
 	bool found=true;
 	while (found)
@@ -60,10 +61,10 @@ bool CdizInfo::setLangTags(CStringW &dizname, CString &language, bool silent, di
 			found=true;
 		}
 		
-		if (dizname.Find(L"(Il)") != -1)
+		if (dizname.Find(L"(He)") != -1)
 		{
 			language +=L"Hebrew, ";
-			dizname.Replace(L"(Il)",L"");
+			dizname.Replace(L"(He)",L"");
 			m_dizInfo.lang_hw =1;
 			found=true;
 		}
@@ -289,8 +290,16 @@ bool CdizInfo::setLangTags(CStringW &dizname, CString &language, bool silent, di
 			found = true;
 		}
 
+		if (dizname.Find(L"(Fa)") != -1)
+		{
+			language += L"Persian, ";
+			dizname.Replace(L"(Fa)", L"");
+			m_dizInfo.lang_fa = 1;
+			found = true;
+		}
+
 		// depricated tags
-		if ( (dizname.Find(L"(Dk)") != -1) || (dizname.Find(L"(Sp)") != -1) || (dizname.Find(L"(Cn)") != -1))
+		if ((dizname.Find(L"(Dk)") != -1) || (dizname.Find(L"(Sp)") != -1) || (dizname.Find(L"(Cn)") != -1) || (dizname.Find(L"(Il)") != -1) )
 		{
 			AfxMessageBox(L"Depricated language detected."+dizname, MB_ICONEXCLAMATION, 0);
 			return false;
@@ -302,10 +311,18 @@ bool CdizInfo::setLangTags(CStringW &dizname, CString &language, bool silent, di
 	pos = dizname.Find(L"(");	// look for any uncaught languages
 	if ((pos != -1) && (!silent))
 	{
-		if (dizname.Mid(pos+3,1) == L")")
+		if (dizname.Mid(pos + 3, 1) == L")")
 		{
-			AfxMessageBox(L"Unknown language detected."+dizname, MB_ICONEXCLAMATION, 0);
-			return false;
+			// it's possible it's just a short translation name.  Check for nonstandard characters there.
+			CStringW f = dizname.Mid(pos + 1, 1);
+			CStringA u(f);
+			char* str = (char *)(LPCSTR)u;
+
+			if (!snt.is_utf8(str))
+			{
+				AfxMessageBox(L"Unknown language detected." + dizname, MB_ICONEXCLAMATION, 0);
+				return false;
+			}
 		}
 	}
 
@@ -459,6 +476,8 @@ bool CdizInfo::setFlags(CString &dizname, CString &flags, bool silent, dizInfo &
 			tmp2=L"Korean";
 		if (tmp == L"Fi")
 			tmp2=L"Finnish";
+		if (tmp == L"He")
+			tmp2 = L"Hebrew";
 
 		if ( (tmp2.GetLength()==0)  && (!silent) )
 			AfxMessageBox(L"WTF is this? "+dizname, MB_ICONEXCLAMATION, 0);

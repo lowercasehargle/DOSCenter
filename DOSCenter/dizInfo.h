@@ -45,6 +45,7 @@ struct dizInfo
 	BOOL	lang_hr;
 	BOOL	lang_br;
 	BOOL	lang_ee;
+	BOOL	lang_fa;
 	BOOL	lang_multi;
 	
 	BOOL	kgd;		// known good dump

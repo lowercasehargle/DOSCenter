@@ -35,6 +35,10 @@
 #define STATUS_ROM_ELSEWHERE 	(1 << 5)	// same file is located in other .dat entries
 #define STATUS_ROM_IGNORED 		(1 << 6)	// this file is in the user's ignore list
 #define STATUS_ROM_WRONGCASE 	(1 << 7)	// case is incorrect, we know the filename matched.
+#define STATUS_ROM_MISSING		(1 << 8)	// can't find this file in the zip
+#define STATUS_ROM_WRONGNAME	(1 << 9)	// CRC is good, filename is wrong
+#define STATUS_ROM_SKIPPED	    (1 << 10)	// could probably use ROM_IGNORED, but this is for folders only currently.
+#define STATUS_ROM_EXTRA		(1 << 11)	// zip has extra file compared to dat entry.
 #define STATUS_ROM_PERFECT_MATCH (STATUS_CRC_MATCH + STATUS_SIZE_MATCH + STATUS_FILENAME_MATCH + STATUS_TIMESTAMP_MATCH)
 //unused #define STATUS_ROM_FOUND (STATUS_CRC_MATCH + STATUS_FILENAME_MATCH)
 
@@ -86,23 +90,24 @@ public:
 	int m_zipROMNameMatches;
 	int m_zipTimestampMatches;
 	int m_exactMatches;
-	int m_zipIgnored;
-	int m_datIgnored;
+	//int m_zipIgnored;
+	//int m_datIgnored;
 	CString m_SourcePath;		// path of files we're scanning
 	CString m_spamFile;			
 	bool m_autoAdd;
 	bool m_autoAddScan;
 	int scanAZipFile(CString sourceFile, int &matches, int &missing, int &unknown, int &flags);
-	void zip2map(CString zipFilename);
-	void zip2map2(CString zipFilename);
+	//void zip2map(CString zipFilename);
+	void zip2map2(CStringW zipFilename, bool dontadjustpaths=false);
 	void sortTopTen();
-	int scanCRCs(unsigned int crc, CString romName, unsigned int size);
+	//int scanCRCs(unsigned int crc, CString romName, unsigned int size);
 	int addtoTop10(CString zipName);
 	int m_scannedZipFileCount;
 	void initTopTen(void);
-	int findDatMatch(unsigned long long crcsize, CStringW romName);
+	//int findDatMatch(unsigned long long crcsize, CStringW romName);
 	int addtoTop102(int datPtr);
-	void zip2_crcmap(CString zipFilename, DATFILESTRUC &zipMap);
+	int doesROMExistinDat(unsigned long long crc);
+	//void zip2_crcmap(CString zipFilename, DATFILESTRUC &zipMap);
 	// column widths for left and right panels
 // Color,0; Filename,150; New Filename,200; Score,50
 // Color,0; name,80; type,40; size,70; date,70; crc,70
@@ -155,7 +160,7 @@ typedef struct _COLUMNWIDTHS
 	CString m_updatePackSourcePath;
 	afx_msg void OnBnClickedZipfolderbrowsebtn();
 
-	CString findRootZipFolder();
+	//CString findRootZipFolder();
 	CString extractExtension(CStringW &filename);
 	void updateZipList();
 	void scanAllFiles();
@@ -166,14 +171,15 @@ typedef struct _COLUMNWIDTHS
 	void renameZipFileWithPopUpDialog();
 	bool unzipAFile(CStringW zipFilename, CStringW destination);
 	bool zipAFile(CStringW zipFilename, CStringW sourceFolder);
-	CString m_buriedZipFolder;
+	CStringW m_buriedZipFolder;
 	void moveSelectedFiles(CString tgtPath);
-	void checkDatvsZip(int zipPos, DATFILESTRUC &zipMap, bool cleanup);
+	//void checkDatvsZip(int zipPos, DATFILESTRUC &zipMap, bool cleanup);
 	void compareDat2Zip(int zipPos, int m_nFileCount, bool cleanup);
 	void OnLvnKeydownLeftsidelist(NMHDR *pNMHDR, LRESULT *pResult);
 	void OnLvnKeydownZipdetailslist(NMHDR *pNMHDR, LRESULT *pResult);
 	void CopyToClipboard(const char* stringbuffer);
 	void OnNMDblclkDatFileList(NMHDR *pNMHDR, LRESULT *pResult);
+	void hexViewAFile(CString filename, CString displayfilename);
 	void hexViewFile();
 	void add2Ignore();
 	void unNestZipFile();
@@ -185,7 +191,8 @@ typedef struct _COLUMNWIDTHS
 	bool make_diz(CStringW filename, dizInfo &m_dizInfo);
 	bool checkForDiz(CStringW filename);
 	afx_msg void OnBnClickedDatquery();
-	bool is_utf8(const char* string);
+	bool extractFileFromZip(CString zipFilename, CString filename, CString targetFilename);
+
 	bool add2zip(CStringW zipFilename, CString targetFile, bool storeFolder=false);
 	bool file2DB(CStringW filename);
 	bool moveZipIntoTDCArchive(CStringW filename);
@@ -196,6 +203,6 @@ typedef struct _COLUMNWIDTHS
 	void addFile2Spam();
 	LRESULT  OnDropFiles(WPARAM wParam, LPARAM lParam);
 	void OnUpdateMyMenuItem(CCmdUI *pCmdUI);
-	CString status_to_color(int status);
+	CString status2color(int status);
 	void displayZipFileInfoText();
 };

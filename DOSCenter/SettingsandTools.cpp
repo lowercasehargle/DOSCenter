@@ -12,7 +12,7 @@
 #include "ScoringSetupDlg.h"
 #include "HaveMissDlg.h"
 #include "PopupViewerTxtDlg.h"
-
+#include "adAssassinDlg.h"
 
 
 
@@ -52,6 +52,7 @@ BEGIN_MESSAGE_MAP(CSettingsandTools, CDialog)
 	ON_BN_CLICKED(IDC_PERFECTSTOO, OnBnClickedPerfectstoo)
 	ON_BN_CLICKED(IDC_HAVEMISSLISTCFG, OnBnClickedHavemisslistcfg)
 	ON_BN_CLICKED(IDC_MDB_CHECK, &CSettingsandTools::OnBnClickedMdbCheck)
+	ON_BN_CLICKED(IDC_AD_ASSASSIN_BTN, &CSettingsandTools::OnBnClickedAdAssassinBtn)
 END_MESSAGE_MAP()
 
 
@@ -132,6 +133,13 @@ void CSettingsandTools::OnBnClickedLoaddatfile()
 // one for the zipfile and one for the roms inside each zip
 // for each rom,we have an index pointer back to the zip that contains said rom.
 //TODO - think about a method of loading in binary data so that parsing would be faster.  if one I could get a cmap memory dump and just load that bitch in!
+/*
+build 2 maps at this level.
+1 flat map, where
+ datmap[datEntryNum] = filename, rom count, totalsize, map of all roms.  No collisions here since it's just a binary version of the .dat file.
+ crcmap[crc] = datEntryNum.  many CRC collisions here with gwbasic.exe, etc.  so the datEntryNum itself is a map
+*/
+
 void CSettingsandTools::parseDATFile()
 {
 	FILE* inFile;
@@ -144,7 +152,7 @@ void CSettingsandTools::parseDATFile()
 	int romend=0;
 	int zipSize;
 	CStringW name;
-	CString ssize;
+	CString ssize = L"";
 	CString scrc;
 	CStringW tmp;
 	CString datetime;
@@ -162,8 +170,13 @@ void CSettingsandTools::parseDATFile()
 	
 	unsigned int size;
 	CProgressDlg progDlg;
-	progDlg.Init(PROG_MODE_TIMER, 1000, L"Loading .dat file...");
+	progDlg.Init(PROG_MODE_TIMER, 1000, L"Loading .dat file...",L"");
 
+	progDlg.UpdateText(L"Loading .dat file...", L"Purging any previous dat entries...");
+	deleteKeys();
+	progDlg.UpdateText(L"Loading .dat file...", L"");
+	
+	//progDlg.UpdateText(L"Parsing .dat file...", ssize);
     _wfopen_s(&inFile, theApp.m_DATPath, L"rtS, ccs=UTF-8");
 
 	if (inFile == NULL)
@@ -183,7 +196,10 @@ void CSettingsandTools::parseDATFile()
     }
 
     fclose(inFile);
+	
+	progDlg.UpdateText(L"Parsing .dat file...", ssize);
 
+	theApp.m_totalCollisions = 0;
 
 	pos =0;
 	pos2 = buffer.find(L"\n)\n");
@@ -223,8 +239,7 @@ void CSettingsandTools::parseDATFile()
 	theApp.m_datComment.Replace(L"Comment:",L"");
 	theApp.m_datComment.Trim();
 
-	deleteKeys();
-	
+
 	// for every game{...} entry in the .dat file
 	while (1)
 	{
@@ -308,8 +323,8 @@ void CSettingsandTools::parseDATFile()
 		
 			// ok, we have a ROM to store in the database.
 			// plug the above parsed values into our .dat entry
-			rom2datmap(name, size, status, false, date, scrc, theApp.m_datfileCount, romCount);
-			romCount++;	
+			if (rom2datmap(name, size, status, false, date, scrc, romCount))
+				romCount++;	
 		}	// while parsing rom entries
 
 
@@ -320,6 +335,7 @@ void CSettingsandTools::parseDATFile()
 		theApp.m_datZipList[theApp.m_datfileCount].numBytes = zipSize;
 		if (tZipped) 
 			theApp.m_datZipList[theApp.m_datfileCount].status = TZIPPED;
+		
 		theApp.m_datfileCount++;	// global counter of # of items in the .dat file
 
 	} // while parsing the .dat file
@@ -356,12 +372,14 @@ The above map CRC/dat ptr map is used for scanning an incoming zip file to quick
 Once the dat pointer is disocovered, that zip can get a closer examination of content.
 
 
+
+
+
+
 */
-
-
-void CSettingsandTools::rom2datmap(CStringW romName, unsigned int size, int status, bool found, unsigned int date, CString scrc, unsigned int ptr2zip, int romCount)
+bool CSettingsandTools::rom2datmap(CStringW romName, unsigned int size, int status, bool found, unsigned int date, CString scrc, int romCount)
 {
-	ROMdata romInfo, tempROMdata;	// tempRomdata for lookups only
+	//ROMdata romInfo, tempROMdata;	// tempRomdata for lookups only
     LPCWSTR ROMCRCKey;			// CRC is the key to storage
 	CString tmpCrc;
 	unsigned int crc;
@@ -369,18 +387,20 @@ void CSettingsandTools::rom2datmap(CStringW romName, unsigned int size, int stat
 	
 	unsigned long long crcsize;
 	unsigned long long collisionCount = 0;
-	_NEWROMINFO myROMInfo;
+//	_NEWROMINFO myROMInfo;
 	bool collision = false;
+	CStringW tmprom;
 
 	swscanf_s(scrc,L"%x",&crc);				
 
-	romInfo.fileName = romName;
-	romInfo.size = size;
-	romInfo.status = status;	
-	romInfo.collision = 0;
-	romInfo.date = date;
-	romInfo.crc = crc;
-	romInfo.ptr2zipFileArray = ptr2zip;	// save a pointer (index) into the zip filename array
+	// i dont need to do this.  i'm just putting all the things passed in into a structure only to pull them back out again later.
+	//romInfo.fileName = romName;
+	//romInfo.size = size;
+	//romInfo.status = status;	
+	//romInfo.collision = 0;
+	//romInfo.date = date;
+	//romInfo.crc = crc;
+	//romInfo.ptr2zipFileArray = ptr2zip;	// save a pointer (index) into the zip filename array
 
 	// CRC collisions.
 	// collisions take several forms.
@@ -470,53 +490,97 @@ void CSettingsandTools::rom2datmap(CStringW romName, unsigned int size, int stat
 	theApp.m_datCRCMap[crcsize] = myROMInfo;
 
 #endif
-//debug!	if (romName.Find(L"LEVEL01") != -1) int g = 0;
 
-	// if CRC is 0, create a fake CRC based off the filename. This allows disk labels to still be uniquely identified.
+/* 
+Zip file and dat handling annoyance:
+	 
+some zip have folders encoded like this:
+ file.exe
+ \folder\
+ \folder\file.txt
+	
+ where some zips have folders encoded like this
+ file.exe
+ \folder\file.txt
+
+ This appears to be a byproduct of whichever zip tool was used to generate the zip file, thus we can't know which way a zip is going to 
+ present itself when scanning incoming files.  
+ the blank/empty folders are counted as files, so when the .dat file has no empty folders but the zip does, now we get missing "files" during scanning.
+
+ Best solution here is to simply skip over empty folder names both when creating the .dat file and when scanning.
+ We're not really losing any information by doing this, since we can always extrapolate the folder name from the filename if needed.
+
+*/
+
+	// if CRC is 0, create a fake CRC based off the filename. This allows disk labels or other 0 byte files to still be uniquely identified.
 	if ((crc == 0) && (size == 0))
 	{
-		if (romName.Right(1) == '\\') // is this a folder only?  Skipit.
-			return;
-		CStringW tmprom = romName;
+		if (romName.Right(1) == '\\') // is this a folder only?  Skipit entirely. (see note above)
+			return false;
+		tmprom = romName;
 		tmprom.MakeLower();
 		crc = hashAString((CT2A)tmprom, 0);
 	}
 		
+	crcsize = size;
+	crcsize = (unsigned long long)(crcsize << 32);
+	crcsize |= crc; // +size;
 
-	crcsize = crc + size;
-	myROMInfo.date = date;
-	myROMInfo.name = romName;
-	myROMInfo.status = 0;
-	myROMInfo.size = size;
-	myROMInfo.datPtr = ptr2zip;
-	//myROMInfo.datOff = romCount;
-	myROMInfo.collsionCount = 0;
 
-	// i think we should skip handling collisions at the .dat level.
+	// add this ROM's CRC into the global CRC map
 
-	while (theApp.m_datMap.CRCMap.count(crcsize) == 1)
+	if (theApp.m_crcMap.count(crcsize) == 0)
 	{
-		// CRCsize collision, make a note in the original entry
-	//	theApp.m_datMap.CRCMap[crcsize].status |= NEW_STATUS_COLLISION;
-		// make a new key by simply incrementing a number outside of the possible max value of CRC+size
-		collisionCount++;
-		crcsize &= 0xfffffffff;
-		crcsize |= (collisionCount << COLLISION_COUNT_START_BIT);
-	//	theApp.m_datMap.CRCMap[crcsize].collsionCount = collisionCount;	// update the 1st ROM map entry with the new count
-
-		collision = true;
+		// first time this CRC has been detected
+		theApp.m_crcMap[crcsize].collisionCount = 0;
+		// save a pointer for this CRC back to the dat entry so when scanning incoming zips, we can back trace to the dat file.
+		theApp.m_crcMap[crcsize].datPtr.push_back(theApp.m_datfileCount);
 	}
-	theApp.m_datMap.CRCMap[crcsize] = theApp.m_datfileCount; // pointer to the below data.
+	else
+	{
+		// a crc collision.
+		theApp.m_crcMap[crcsize].collisionCount++;
+		theApp.m_totalCollisions++;
+		
+		// if this CRC collision is in the same .dat entry, hash the filename and store it so we can keep collisions inside an entry separate.
+		// don't bother recording the dat entry for this CRC since we already have it.
+		// this is experimental!
+		int prevEntry = theApp.m_crcMap[crcsize].datPtr.back();
+		if (prevEntry == theApp.m_datfileCount)
+		{
+			tmprom = romName;
+			tmprom.MakeLower();
+			theApp.m_crcMap[crcsize].filenameHash = hashAString((CT2A)tmprom, 0);
+		}
+		// save a pointer for this CRC back to the dat entry so when scanning incoming zips, we can back trace to the dat file.
+		theApp.m_crcMap[crcsize].datPtr.push_back(theApp.m_datfileCount);
+	}
+
+
+//	while (theApp.m_datMap.CRCMap.count(crcsize) == 1)
+//	{
+//		// CRCsize collision, make a note in the original entry
+//	//	theApp.m_datMap.CRCMap[crcsize].status |= NEW_STATUS_COLLISION;
+//		// make a new key by simply incrementing a number outside of the possible max value of CRC+size
+//		collisionCount++;
+//		crcsize &= 0xfffffffff;
+//		crcsize |= (collisionCount << COLLISION_COUNT_START_BIT);
+//	//	theApp.m_datMap.CRCMap[crcsize].collsionCount = collisionCount;	// update the 1st ROM map entry with the new count
+//
+//		collision = true;
+//	}
+//	theApp.m_datMap.CRCMap[crcsize] = theApp.m_datfileCount; // pointer to the below data.
 
 	// store this same data indexed via the ptr2zip
 	//  master dat list [ index (aka dat ptr)]  "ROM" info
-	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].name = romInfo.fileName;
-	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].crc = romInfo.crc;
-	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].size = romInfo.size;
-	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].date = romInfo.date;
-	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].status = romInfo.status;
+	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].name = romName;
+	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].crc = crcsize;
+	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].size = size;
+	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].date = date;
+	theApp.m_datZipList[theApp.m_datfileCount].ROMsMap[romCount].status = status;
 
 	theApp.m_datROMCount++;
+	return true;
 }
 
 // convert a date+time string to a 32bit value 
@@ -611,16 +675,17 @@ void CSettingsandTools::Add2DatFile()
 void CSettingsandTools::entry2File(CStringW entry)
 {
 	FILE* outFile;
+	errno_t err;
 	// append to the .dat file
-	_wfopen_s(&outFile, theApp.m_DATPath, L"a, ccs=UTF-8");
-	
+	err = _wfopen_s(&outFile, theApp.m_DATPath, L"a, ccs=UTF-8");
 	if (outFile == NULL)
-		AfxMessageBox(L"Failed to open dat file:"+theApp.m_DATPath, MB_ICONEXCLAMATION, 0);
-	else
 	{
-		fwrite(entry, sizeof( wchar_t ), entry.GetLength(), outFile );
-		fclose(outFile);
+		AfxMessageBox(L"Failed to open dat file:"+theApp.m_DATPath, MB_ICONEXCLAMATION, 0);
+		return;
 	}
+
+	fwrite(entry, sizeof( wchar_t ), entry.GetLength(), outFile );
+	fclose(outFile);
 }
 
 //todo - add a simple map here which keeps track of filenames, so we don't get a duplicate on the way in.
@@ -644,7 +709,9 @@ void CSettingsandTools::makeDATFile(CString m_SourcePath)
 	unsigned int m_zipCount=0;
 	unsigned int m_romCount=0;
 	CProgressDlg progDlg;
-	
+	if (m_SourcePath.GetLength() == 0)
+		return;
+
 	if (!m_cmdLine)
 	{
 		
@@ -675,7 +742,7 @@ void CSettingsandTools::makeDATFile(CString m_SourcePath)
 		
 		if (!m_cmdLine)
 			progDlg.UpdateText(L"Scanning files, hang on...",filename);
-		
+			
 		// here we open the zip file, and get the contents out.
 		m_romCount +=zip2dat(filename);
 		m_zipFiles++;	// next file please
@@ -704,10 +771,6 @@ CStringW datsPath = L"E:\\FTP site\\DOSGuy uploads\\TDC_WIP\\Games\\dats"; // to
 	WIN32_FIND_DATAW FindFileData;
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 
-	FILETIME ftCreate, ftAccess, ftWrite;
-	SYSTEMTIME stUTC, stLocal;
-
-
 	if (!m_cmdLine)
 	{
 
@@ -715,7 +778,6 @@ CStringW datsPath = L"E:\\FTP site\\DOSGuy uploads\\TDC_WIP\\Games\\dats"; // to
 	}
 
 
-	// get the timestamp of each .dat file in the dats collection
 
 	// now we have the path+filename we want to work with.
 	// scan all the files in this selected folder.
@@ -779,54 +841,54 @@ void CSettingsandTools::OnBnClickedMakeadat()
 	// browse to the output filename
 	fileStuff.m_windowTitle = L"Name of file to create...";
 	if (fileStuff.UserBrowseSave(&theApp.m_DATPath, L"dat files (*.dat)\0*.dat", L"dat") != TRUE)
-		return;
+return;
 
-	// popup the .dat file information GUI
-	
-	CDATFileInfoDlg dlg;
-	dlg.m_displayOnly = false;
-	if (dlg.DoModal() == 2)	// cancel button hit?
-		return;
+// popup the .dat file information GUI
 
-	m_recursive = dlg.m_recursive;
-	header = "DOSCenter (\r\n\tName:";
-	header +=dlg.m_datTitleTxt;
-	header +="\r\n\tDescription: ";
-	header +=dlg.m_datDescTxt;
-	header +="\r\n\tVersion: ";
-	header +=dlg.m_datVerTxt;
-	header +="\r\n\tDate: ";
-	header +=dlg.m_dateTxt;
-	header +="\r\n\tAuthor: ";
-	header +=dlg.m_datAuthorTxt;
-	header +="\r\n\tHomepage: ";
-	header +=dlg.m_datWebTxt;
-	header +="\r\n\tComment: ";
-	header +=dlg.m_datCommentTxt;
-	header +="\r\n)";
-	
-	// delete the .dat file if it exists, since the creator program uses append mode.
-	// add a header to it.
-	// path of files we're scanning
-	//TODO - make a subroutine of this "writeheader" so we can call it from the command line the same way.
-	_wfopen_s(&outFile, theApp.m_DATPath, L"w, ccs=UTF-8");
-	if ( outFile != NULL )
-	{
-		header.Replace(L"\r\n", L"\r");
-		fwrite(header, sizeof( wchar_t ), header.GetLength(), outFile );
-		fclose(outFile);
-		outFile=NULL;
-	}
-	// using current zip folder instead of home folder
-	makeDATFile(m_SourcePath);
+CDATFileInfoDlg dlg;
+dlg.m_displayOnly = false;
+if (dlg.DoModal() == 2)	// cancel button hit?
+return;
 
-	CRegistry regMyReg( CREG_CREATE );  // create registry key if it doesn't exist.
-	if ( regMyReg.Open(L"Software\\DOSCenter",HKEY_CURRENT_USER) ) 
-		{
-			// Now set the new values
-			regMyReg[L"masterCollectionFolder"] = theApp.m_collectionPath;
-			regMyReg.Close();
-		}
+m_recursive = dlg.m_recursive;
+header = "DOSCenter (\r\n\tName:";
+header += dlg.m_datTitleTxt;
+header += "\r\n\tDescription: ";
+header += dlg.m_datDescTxt;
+header += "\r\n\tVersion: ";
+header += dlg.m_datVerTxt;
+header += "\r\n\tDate: ";
+header += dlg.m_dateTxt;
+header += "\r\n\tAuthor: ";
+header += dlg.m_datAuthorTxt;
+header += "\r\n\tHomepage: ";
+header += dlg.m_datWebTxt;
+header += "\r\n\tComment: ";
+header += dlg.m_datCommentTxt;
+header += "\r\n)";
+
+// delete the .dat file if it exists, since the creator program uses append mode.
+// add a header to it.
+// path of files we're scanning
+//TODO - make a subroutine of this "writeheader" so we can call it from the command line the same way.
+_wfopen_s(&outFile, theApp.m_DATPath, L"w, ccs=UTF-8");
+if (outFile != NULL)
+{
+	header.Replace(L"\r\n", L"\r");
+	fwrite(header, sizeof(wchar_t), header.GetLength(), outFile);
+	fclose(outFile);
+	outFile = NULL;
+}
+// using current zip folder instead of home folder
+makeDATFile(m_SourcePath);
+
+CRegistry regMyReg(CREG_CREATE);  // create registry key if it doesn't exist.
+if (regMyReg.Open(L"Software\\DOSCenter", HKEY_CURRENT_USER))
+{
+	// Now set the new values
+	regMyReg[L"masterCollectionFolder"] = theApp.m_collectionPath;
+	regMyReg.Close();
+}
 //	((CButton*)GetDlgItem(IDC_ZIPFOLDERTXT))->SetWindowText("Zip folder: "+m_SourcePath);
 
 
@@ -835,54 +897,101 @@ void CSettingsandTools::OnBnClickedMakeadat()
 int CSettingsandTools::zip2dat(CStringW zipfilename)
 {
 	CStringW datEntry;
-	CStringW filename, ext, size, crc, date;
+	CStringW filename, ext, size, scrc, date, tmp;
 	WORD dosDate;
 	WORD dosTime;
 	CTime time;
 	CDOSCenterDlg dc;
 
 	// grab the zip and start collecting each file inside.
-	dc.zip2map(zipfilename);
+	dc.zip2map2(zipfilename);
 
 
 	// remove the path off the filename if told to on the command line
 	if (m_noPathInDat)
 	{
 		//if (zipfilename.Find('\\') != -1) 
-			//zipfilename = zipfilename.Right(zipfilename.GetLength() - (zipfilename.ReverseFind('\\')) -1 );
+		//zipfilename = zipfilename.Right(zipfilename.GetLength() - (zipfilename.ReverseFind('\\')) -1 );
 		zipfilename = theApp.extractFilenameWOPath(zipfilename);
 	}
 
-	int g = tmpZipList[zipfilename];
 	if (tmpZipList[zipfilename] == 1)
 	{
 		if (!theApp.m_quietmode)
 		{
-			AfxMessageBox(L"Duplicate file detected and skipped!\r\n"+zipfilename, MB_ICONEXCLAMATION, 0);
+			AfxMessageBox(L"Duplicate zip filename detected and skipped!\r\n" + zipfilename, MB_ICONEXCLAMATION, 0);
 			return 0;
 		}
 	}
-	else 
+	else
 		tmpZipList[zipfilename] = 1;
 
-	
-	g = tmpZipList[zipfilename];
-
 	datEntry = L"\ngame (\n\tname \"";
-	datEntry+=zipfilename + L"\"\n";
+	datEntry += zipfilename + L"\"\n";
 
-	for (int i=0; i<theApp.m_nFileCount; i++)	// gather all the info for each file in this zip and display it on the right hand window
+
+	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
+	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
+	{
+		filename = theApp.m_zipMap[0].it->second.name;	// get updated raw rom name from the zip and keep track of it for later.
+		tmp = filename;
+		ext = dc.extractExtension(tmp);
+		size.Format(L"%d", theApp.m_zipMap[0].it->second.size);
+		unsigned int crc = theApp.m_zipMap[0].it->second.crc;
+		// special patch for some weird shit where sometimes a folder has a non-zero size and this throws off everyone.
+		if (((ext.Right(1) == '\\') || (filename.Right(1) == '\\')) && (crc == 0) && (size != '0'))
+		{
+			// todo: sure would be nice to log these so the zip could be repackaged to fix this.
+			size = L"0";
+		}
+
+		scrc.Format(L"%08x", crc);
+		dosDate = (WORD)(theApp.m_zipMap[0].it->second.date >> 16);
+		dosTime = (WORD)theApp.m_zipMap[0].it->second.date & 0xffff;
+		CTime time(dosDate, dosTime);
+		date = time.Format(L"%Y/%m/%d %H:%M:%S");
+
+		scrc.MakeUpper();
+
+		datEntry += "\tfile ( name ";
+		datEntry += filename;
+		datEntry += " size ";
+		datEntry += size;
+		datEntry += " date ";
+		datEntry += date;
+		datEntry += " crc ";
+		datEntry += scrc;
+
+		datEntry += " )\n";
+
+
+		theApp.m_zipMap[0].it++;
+	}
+
+
+#if 0
+	for (int i = 0; i < theApp.m_nFileCount; i++)	// gather all the info for each file in this zip and display it on the right hand window
 	{
 		filename = theApp.m_tmpzipList[i].fileName;
+		theApp.m_zipMap[0].ROMmap[filename].name
 		ext = dc.extractExtension(filename);
-		size.Format(L"%d",theApp.m_tmpzipList[i].size);	
-		crc.Format(L"%08x", theApp.m_tmpzipList[i].crc);
+		size.Format(L"%d", theApp.m_tmpzipList[i].size);
+		unsigned int crc = theApp.m_tmpzipList[i].crc;
+
+		// special patch for some weird shit where sometimes a folder has a non-zero size and this throws off everyone.
+		if ( ((ext.Right(1) == '\\') || (filename.Right(1) == '\\')) && (crc == 0) && (size != '0') )
+		{
+			// todo: sure would be nice to log these so the zip could be repackaged to fix this.
+			size = L"0";
+		}
+
+		scrc.Format(L"%08x", crc);
 		dosDate = (WORD)(theApp.m_tmpzipList[i].date >> 16);
 		dosTime = (WORD)theApp.m_tmpzipList[i].date & 0xffff;
 		CTime time(dosDate, dosTime);
 		date =time.Format(L"%Y/%m/%d %H:%M:%S" );
 
-		crc.MakeUpper();
+		scrc.MakeUpper();
 
 		datEntry +="\tfile ( name ";
 		datEntry +=theApp.m_tmpzipList[i].fileName;
@@ -891,11 +1000,11 @@ int CSettingsandTools::zip2dat(CStringW zipfilename)
 		datEntry+=" date ";
 		datEntry +=date;
 		datEntry+=" crc ";
-		datEntry +=crc;
+		datEntry +=scrc;
 
 		datEntry +=" )\n";
 	}
-	
+#endif	
 	datEntry +=")\n";
 	// huck it into the file
 	entry2File(datEntry);
@@ -992,16 +1101,19 @@ void CSettingsandTools::OnBnClickedHavemisslistcfg()
 	CHaveMissDlg dlg;
 	dlg.DoModal();
 }
+
+// purge all databases from memory.  Called typically when loading a new dat file or exiting from DOSCenter altogether.
 void CSettingsandTools::deleteKeys()
 {
     ROMdata tempROMdata;						// only used for deleting the entire cmap
 	POSITION pos;
 	CString    nKey;
 
-	// delete the existing cmap data if we're reloading a file.
-	// unfortunately, this doesn't work at all.  fucking cmaps.
-	if (theApp.m_datfileCount != 0)
+	if (theApp.m_DATfileLoaded)
 	{
+
+		theApp.m_crcMap.clear();
+
 		// delete the elements
 		pos = theApp.m_ROMDATEntryName.GetStartPosition();
 		while( pos != NULL )
@@ -1078,7 +1190,6 @@ void CSettingsandTools::OnBnClickedLoadMDBfile()
 
 
 // open and load the mdb file into memory
-// TODO move this into theApp so it's globally available.
 void CSettingsandTools::loadMDB(CString mdbFile)
 {
 	ZipInfoMDB tmpZipInfo;
@@ -1268,6 +1379,7 @@ void CSettingsandTools::updateDBRecord(int inputFlag, CStringW sold, CStringW sn
 	m_pSet.m_Croatian = tmpDiz.lang_hr;
 	m_pSet.m_Brazilian = tmpDiz.lang_br;
 	m_pSet.m_Estonian = tmpDiz.lang_ee;
+	m_pSet.m_Persian = tmpDiz.lang_fa;
 
 	// and write it in
 	//UpdateData(FALSE);
@@ -1301,42 +1413,45 @@ void CSettingsandTools::OnBnClickedMdbCheck()
 	CStringW dataOut;
 	ZipInfoMDB tmpZipInfo;
 	CSADirRead m_dr;
+	unsigned int hash;
 	CSADirRead::SAFileVector::const_iterator m_fit; // index thingyabob into file array
 	CPopupViewerTxtDlg dlg;
 
 	CProgressDlg progDlg;
 	progDlg.Init(PROG_MODE_TIMER, 1000, L"Scanning files...");
 
+	std::map <unsigned int, CStringW > filenameHash;
+	std::map <unsigned int, CStringW >::iterator filenameHashIt;
+
+
+
 	if (!theApp.m_MDBfileLoaded)
 	{
 		OnBnClickedLoadMDBfile();
 	}
-	dataOut = L"--Files tagged as found in the database--\r\n";
+	dataOut = L"--Extra files not in the database--\r\n";
 
 	for (int l = 0; l<theApp.m_romCountMDB; l++)
 	{
 		// if we know it's missing, no point in checking.
 		if (theApp.m_zipListMDB[l].found == false)
+		{
+			//CStringW f = theApp.m_zipListMDB[l].filename;
 			continue;
+		}
 		fiz.zipName2Vars(theApp.m_zipListMDB[l].filename, false, tmpDiz);
 		checkName = theApp.m_collectionPath + tmpDiz.year + L"\\" + theApp.m_zipListMDB[l].filename;
-		progDlg.UpdateText(L"Scanning files...", checkName);
-
-		inFile = _wfopen(checkName, L"r");
-		if (inFile == NULL)
-		{
-			dataOut += checkName+L"\r\n";
-		}
-		else // we found the file
-		{
-			fclose(inFile);
-			inFile = NULL;
-		}
+		//progDlg.UpdateText(L"Scanning files...", checkName);
+		hash = hashAString((CT2A)checkName, 0);
+		if (filenameHash[hash].IsEmpty())
+			filenameHash[hash] = checkName;
+		else
+			dataOut = L"--HASH COLLISION DETECTED--\r\n" + checkName+L"\r\n";
 	}
 	
 	progDlg.UpdateText(L"Checking for files not in the database...", L"");
 	// now do the inverse.  Every file in the TDC archive must be in the db.
-	dataOut += L"--Files in TDC that are missing from the database--\r\n";
+	//dataOut += L"--Files in TDC that are missing from the database--\r\n";
 	// scan and build a listing of all the files we can locate.
 	// now we have the path+filename we want to work with.
 	// scan all the files in this selected folder.
@@ -1356,6 +1471,9 @@ void CSettingsandTools::OnBnClickedMdbCheck()
 	CSADirRead::SAFileVector &files = m_dr.Files();
 	m_fit = files.begin();
 
+	//progDlg.UpdateText(L"Checking for files not in the database...", checkName);
+
+
 	while ((m_fit) != files.end())
 	{
 
@@ -1363,13 +1481,24 @@ void CSettingsandTools::OnBnClickedMdbCheck()
 
 		//matches = "";  // clear previous filename matches		
 		// ok, somewhere in here are our files.  Get one
-		checkName = theApp.extractFilenameWOPath((*m_fit).m_sName);
-		progDlg.UpdateText(L"Checking for files not in the database...", checkName);
-		//fiz.zipName2Vars(checkName, true, tmpDiz);
-		if (!theApp.m_ZIPDATEntryNameMDB.Lookup(checkName, tmpZipInfo))
+		//!checkName = theApp.extractFilenameWOPath((*m_fit).m_sName);
+		hash = hashAString((CT2A)(*m_fit).m_sName, 0);
+
+		CStringW q = filenameHash[hash];
+		if (q == (*m_fit).m_sName)
 		{
-			dataOut += checkName + L"\r\n";
+			filenameHash[hash] = "";	// we physically have this entry from the database in the archive.  
 		}
+		else // a file exists that is not in the database
+		{
+			dataOut += (*m_fit).m_sName + L"\r\n";
+			//filenameHash[hash] = ;
+		}
+		//fiz.zipName2Vars(checkName, true, tmpDiz);
+		//if (!theApp.m_ZIPDATEntryNameMDB.Lookup(checkName, tmpZipInfo))
+		//{
+		//	dataOut += checkName + L"\r\n";
+		//}
 		
 
 		/*
@@ -1398,6 +1527,22 @@ void CSettingsandTools::OnBnClickedMdbCheck()
 		*/
 		m_fit++;
 	}
+
+	dataOut += L"--Files in database not found in archive--\r\n";
+
+	filenameHashIt = filenameHash.begin();
+	while ((filenameHashIt) != filenameHash.end())
+	{
+		
+		//if (filenameHash.at()
+		if (filenameHashIt->second != L"")
+			dataOut += filenameHashIt->second + L"\r\n"; // this is a filenot found in database.
+
+		filenameHashIt++;
+	}
+
+
+
 
 	dlg.m_viewerTxt = dataOut;
 	dlg.m_fileNameViewer = L"Missing report";
@@ -1434,7 +1579,7 @@ void CSettingsandTools::makeLists()
 
 	_wfopen_s(&byyear, theApp.m_dosboxPath + "\\byyear.txt", L"w, ccs=UTF-8");
 
-	for (int year = 1981; year<2020; year++)
+	for (int year = 1981; year<2021; year++)
 	{
 		outDataHave = "";
 		outDataMiss = "";
@@ -1655,4 +1800,28 @@ unsigned int CSettingsandTools::hashAString(char *str, unsigned int hval)
 
 	/* return our new hash value */
 	return hval;
+}
+
+bool CSettingsandTools::is_utf8(const char* string)
+{
+	if (!string)
+		return false;
+
+	const unsigned char * bytes = (const unsigned char *)string;
+
+	while (*bytes != 0x00)
+	{
+		if (*bytes == 0x3f)
+			return true;
+		bytes += 1;
+	}
+	return false;
+}
+
+
+void CSettingsandTools::OnBnClickedAdAssassinBtn()
+{
+	adAssassinDlg dlg;
+	dlg.m_spamAssZipsPath = L"todo..pull last path from registry";
+	dlg.DoModal();
 }

@@ -63,6 +63,7 @@ public:
 	BOOL	m_Croatian;
 	BOOL	m_Brazilian;
 	BOOL	m_Estonian;
+	BOOL	m_Persian;
 	CStringW	m_mobyURL;
 
 // Overrides

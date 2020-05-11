@@ -402,11 +402,6 @@ BOOL CDOSCenterDlg::OnInitDialog()
 	theApp.m_ignoreOn = true;
 	((CButton*)GetDlgItem(IDC_APPLYIGNORE))->SetCheck(theApp.m_ignoreOn);
 
-
-	// allocate a pile o' memory for the .dat file
-//	theApp.m_ROMDATEntryName.InitHashTable(323579,true);
-//	theApp.m_ROMDATEntryCRC.InitHashTable(323579,true);
-	theApp.m_ROMsInZip.InitHashTable(257);
 	theApp.m_datfileCount = 0;
 
 	if (theApp.m_autoLoadDat)
@@ -600,331 +595,6 @@ void CDOSCenterDlg::updateZipList()
    }
 }
 
-// builds an array of best matches.  all we're trying to do is identify the best match in the .dat file.
-// m_topTen[] array filled with the .dat entries that have the most CRC+filename matches
-// returns true if CRC matched, false if not.
-int CDOSCenterDlg::scanCRCs(unsigned int crc, CString romName, unsigned int size)
-{	
-	int	thisHit=0;
-	int status =0;
-	CString tmp;
-	CString scrc;
-	CString tmpCrc;
-	CString zipName;
-	unsigned int collisionCount;
-    LPCWSTR ROMCRCKey;		// CRC is the key to storage
-	ROMdata tempROMdata;	// temporary storage for the lookup
-	ZIPdata tempZIPdata;		// temporary storeage for the zip file (from the .dat) the data came from
-	
-	// create a key out of the romName and CRC
-	scrc.Format(L"%08x",crc);
-
-	//if (theApp.m_ScanCRCFilename)
-	//	tmp = romName+"_"+scrc; //crc!
-	//else
-	//	tmp=scrc;
-//	tmp = scrc;
-
-	ROMCRCKey = scrc;
-
-	// zip files have "roms" in them.
-	// rom can either be identified by CRC or by filename
-	// we want to see both correct filenames but incorrect CRC
-	// and correct CRC and incorrect filename.
-	// map #1: CRC->rom name->zip name
-	// map #2: rom name->crc->zip name
-	// 
-	// inside a zip, only rom filename must be unique, but crc may be duplicated.
-	// (roms in folders will have folder as part of the name, so it's still unique)
-	// 
-	// Flow:
-	//
-	//   look up CRC.  if no hit, then the file is not in the .dat at all 
-	//      If that's the case, we might have a filename that is a new CRC, so go check the filename map
-	//         If filename match, look up ZIP->add to top 10, but note it somehow- (return 1)
-	//      else return 0 (no match at all)
-	//
-	//   if CRC match, check filename. 
-    //		 if match, look up ZIP->add to top 10 (return 3)
-	//     else
-	//       check for collisions, get new name, repeat loop
-	//       no collision? look up ZIP->add to top 10 (return 2)
-	//     
-	// ie: filename+crc match, return  4
-	//     crc match, no filename, return 2
-	//     filename match, no CRC, return 1
-	//     no CRC and no filename match, return 0
-	//  scores > 0, look up the zip filename and add to top 10.
-	//
-
-	/*
-		Flow #2 - faster, more better!
-			Check CRC.  a match means this rom exists somewhere in the .dat
-				if there are multiple .dat entries files with this CRC (collision) check up to MAX_CRC_COLLISIONS, adding each one to the top10 list
-			if there is a unique CRC, make a record of the zip file dat entry that it belongs to. (the top10)
-			we also check the filename against the CRC.  that would be a perfect match vs a CRC only match.  both are good, but perfects are more better.
-
-	After scanning all CRCs of all roms in this zip, likely only 1 entry will be in the top ten, however there may be mixed CRCs in a zip, so we handle multiples.
-	
-	After we have a topten array of possible matches to the .dat file, we go to that .dat entry and re-compare the files in it against the zip.
-	
-	*/
-
-
-
-	// look for the supplied CRC in the database.  This happens for things like drivers which are common across many games.
-	// we support up to MAX_CRC_COLLISIONS to exist in the database.
-
-	// zip files may have the following conditions:
-	// 1) CRC + filename match
-	// 2) CRC match, filename mismatch
-	// 3) multiple files in the zip with different names but the same CRC.  
-	CString oldname = L"";
-	while (theApp.m_ROMDATEntryCRC.Lookup(ROMCRCKey, tempROMdata))	// CRC hit?
-	{	
-		if (status==0)
-		{
-			collisionCount = tempROMdata.collision;
-			if (collisionCount > TOPARRAYSIZE)
-			{
-				status = 3; // skip this file for now - too many collisions to deal with.
-				break;
-			}
-		}
-
-		status = 1; // this file was found
-	//	romName.Trim();	// just in case. some filenames are wonky on purpose
-
-		if (tempROMdata.size != size)
-		{
-			// weird.  we have size difference but CRC match.  Not sure if that's possible.
-
-		}
-		else
-		{
-			if ( (tempROMdata.fileName.MakeLower() == romName) || (romName.Find(tempROMdata.fileName.MakeLower())) ) // filename match too?  gah. find returns false if strings are equal?!?
-			{
-				// get the zip filename from the dat where this rom is located
-				theApp.m_datZipListit = theApp.m_datZipList.find(tempROMdata.ptr2zipFileArray);
-				zipName = theApp.m_datZipListit->second.filename;	// 2nd element is the 2nd thing stored in this map. weird stuff.
-				thisHit = addtoTop10(zipName);	// pull the .zip name from the .dat and add it to our potential selection group
-				m_topTen[thisHit].perfects++;	// name+crc match. 
-				//m_topTen[thisHit].byteMatchCount +=size;  
-				status = 2;
-			}
-			// TODO!!
-			// filename did't match.  could be in a folder, or could be renamed or could have duplicate files with same crc but different name.
-			// TODO!!
-		}
-
-		// were there collsions in the database?
-		if (collisionCount > 0)
-		{
-			tmpCrc = scrc;
-			tmp.Format(L"?%d",collisionCount);
-			tmpCrc.Append(tmp); // += tmp.Format(L"?%d",tempROMdata.collision);
-			ROMCRCKey=tmpCrc;
-			collisionCount--;
-		}
-		else
-			break;	// 1 and only match.
-	}
-
-	// TODO
-	// if there was a collsion, but we didn't match the filename, we still should get some points.
-
-	return status;	// this file/crc has been located	
-}
-// compares CRCs of a zip file against the .dat file.
-// All we're trying to do here is find the .dat file entry that closely matches this zip file
-// once we've picked the closest match, we can closely examine the entry vs zip file later.
-// input: crc+size (64 bit value), name of file
-// output: dat index to closest match
-// TODO - I bet after about 3 or 4 files into a scan, if the zip size is similar to the .dat entry size that we've got our winner....
-
-int CDOSCenterDlg::findDatMatch(unsigned long long crcsize, CStringW romName)
-{
-//	CStringW romname2;
-	unsigned long long collisionCount = 0;
-//	int thisHit=0;
-//	bool crcHit;
-//	int datPtr;
-//	int count;
-//	romName.MakeLower();
-//	crcHit = false;
-#if 0	while (theApp.m_datMap.CRCMap.count(crcsize) == 1)
-	{
-		count = 0;
-		datPtr = theApp.m_datMap.CRCMap[crcsize].datPtr;
-
-		if (bestPicks.count(datPtr))
-		{
-			count = bestPicks[datPtr];
-			count++;
-		}
-		bestPicks[datPtr] = count;
-
-
-		// is this a generic file (GWBASIC.EXE, etc) with a lot of duplicates in the .dat?  if so, just skip 'em.
-		if (theApp.m_datMap.CRCMap[crcsize].collsionCount > TOPARRAYSIZE)
-		break;
-
-		// is this the data we're looking for?
-		romname2 = theApp.m_datMap.CRCMap[crcsize].name;
-		romname2.MakeLower();
-		if (romName == romname2)
-		{
-			thisHit = addtoTop102(theApp.m_datMap.CRCMap[crcsize].datPtr);	// pull the .zip name from the .dat and add it to our potential selection group
-			m_topTen[thisHit].perfects++;
-			m_topTen[thisHit].byteMatchCount += theApp.m_datMap.CRCMap[crcsize].size;
-			crcHit = false;
-		}
-		else
-		{
-			crcHit = true;
-		}
-
-		// see if that was the one and only entry for that ROM
-		if (theApp.m_datMap.CRCMap[crcsize].status & NEW_STATUS_COLLISION)
-		{
-			// make a new key by simply incrementing a number outside of the possible max value of CRC+size
-			collisionCount++;
-			crcsize &= 0xfffffffff;
-			crcsize |= (collisionCount << COLLISION_COUNT_START_BIT);
-		}
-		else
-			break;
-	}
-
-	if (crcHit) // if we've examined all CRC matches and never saw this filename, add it but with an inexact match
-	{
-		thisHit = addtoTop102(theApp.m_datMap.CRCMap[crcsize].datPtr);	// pull the .zip name from the .dat and add it to our potential selection group
-		m_topTen[thisHit].crcMatch++;
-		m_topTen[thisHit].byteMatchCount += theApp.m_datMap.CRCMap[crcsize].size;
-	}
-	
-	//todo - will need 1/x functions here
-	// update this entry's score
-	float score = (float)(m_topTen[thisHit].perfects + m_topTen[thisHit].crcMatch) / (float)m_topTen[thisHit].datCount;
-
-	if (score > 1.0)	// 1/x function
-		score = (float)m_topTen[thisHit].datCount / (float)(m_topTen[thisHit].perfects + m_topTen[thisHit].crcMatch);
-
-	float score2 = (float)m_topTen[thisHit].byteMatchCount / (float)m_topTen[thisHit].datSizeCount;
-	if (score2 > 1.0)	// 1/x function
-		score2 = (float)m_topTen[thisHit].datSizeCount / (float)m_topTen[thisHit].byteMatchCount;
-	score += score2;
-	score = (score / (float)2.0) * 100;
-	m_topTen[thisHit].score = (int)score;
-#endif
-	return 0; //m_topTen[0].datPtr;
-}
-
-
-// add an entry to the top ten (which is now 20)
-// fixme- if we get more than ARRAYSIZE hits, we should sort it as we go so the best always gets to the top.
-int CDOSCenterDlg::addtoTop10(CString zipName)
-{
-	int thisHit;
-	// have we seen this zip filename before? 
-	// increment the counter and that's it.
-	for (thisHit=0; thisHit<TOPARRAYSIZE; thisHit++)
-		{
-			if (m_topTen[thisHit].filename == zipName)
-				{
-					zipName = "";	// nuke name so it doesn't get re-added to the top ten list
-					break;
-				}
-		}
-
-
-	// else, this is a new entry from the .dat file which also has a matching CRC to this file.
-	// like when there are [a1] versions of a zip, this will happen often.
-	if (zipName != "") // new hit.  save some stuff
-		{
-			// if we're about to run out of room in the top ten list, give it a quick score-n-sort to move the better hits up
-			if (m_topTenIdx == (TOPARRAYSIZE-1))
-			{
-				sortTopTen();	// put the best of the best at the top.  better matches in the dat should float to the top
-			}
-
-			m_topTen[m_topTenIdx].filename = zipName;	// save off the zip filename
-			m_topTen[m_topTenIdx].datCount = theApp.m_datZipListit->second.fileCount; // and the numer of roms in this zip
-			m_topTen[m_topTenIdx].zipPos =  theApp.m_datZipListit->first; // and the pointer to the zip file (this is the first item in the map (the key))
-		//	m_topTen[m_topTenIdx].crcMatch=0;
-		//	m_topTen[m_topTenIdx].dupes=0;
-			m_topTen[m_topTenIdx].perfects=0;
-		//	m_topTen[m_topTenIdx].byteMatchCount=0;
-			m_topTen[m_topTenIdx].datSizeCount = theApp.m_datZipListit->second.numBytes;
-			//m_topTen[m_topTenIdx].score=0;
-			m_topTen[m_topTenIdx].zipCount = m_scannedZipFileCount;
-			// zipscore is the number of files in this zip vs the number in the dat we've picked.  it can never be >1.0
-			// this helps weed out compilations which are supersets of individual games. 
-			float zipscore = (float)(m_topTen[m_topTenIdx].datCount / (float)m_topTen[m_topTenIdx].zipCount);
-			if (zipscore > 1.0)	// 1/x function
-				zipscore = ((float)m_topTen[m_topTenIdx].zipCount / (float)m_topTen[m_topTenIdx].datCount);
-			m_topTen[m_topTenIdx].zipScore = zipscore;
-			thisHit= m_topTenIdx;
-			if (m_topTenIdx < (TOPARRAYSIZE-1))
-				m_topTenIdx++;
-		}
-
-	return thisHit;	// return index of this zip filename in the top ten array
-}
-
-
-
-
-// add an entry to the top ten
-// fixme- if we get more than ARRAYSIZE hits, we should sort it as we go so the best always gets to the top.
-int CDOSCenterDlg::addtoTop102(int datPtr)
-{
-
-#if 0
-	CStringW zipName;
-	int thisHit;
-	bool newHit = true;
-
-	// have we seen this zip filename before? 
-	// increment the counter and that's it.
-	for (thisHit = 0; thisHit<TOPARRAYSIZE; thisHit++)
-	{
-		if (m_topTen[thisHit].zipPos == datPtr) //.filename == zipName)
-		{
-			newHit = false; // zipName = "";	// nuke name so it doesn't get re-added to the top ten list
-			break;
-		}
-	}
-
-
-	// else, this is a new entry from the .dat file which also has a matching CRC to this file.
-	// like when there are [a1] versions of a zip, this will happen often.
-	if (newHit) // new hit.  save some stuff
-	{
-		// if we're about to run out of room in the top ten list, give it a quick score-n-sort to move the better hits up
-		if (m_topTenIdx == (TOPARRAYSIZE - 1))
-		{
-			sortTopTen();	// put the best of the best at the top.  better matches in the dat should float to the top
-		}
-		zipName = theApp.m_datZipList[datPtr].filename;
-		m_topTen[m_topTenIdx].filename = zipName;	// save off the zip filename
-		m_topTen[m_topTenIdx].datCount = theApp.m_datZipList[datPtr].fileCount; // and the numer of roms in this zip
-		m_topTen[m_topTenIdx].zipPos = datPtr; //todo- rename to .datPtr = datPtr; // and the pointer to the zip file (this is the first item in the map (the key))
-		m_topTen[m_topTenIdx].crcMatch=0;
-		m_topTen[m_topTenIdx].perfects = 0;
-		m_topTen[m_topTenIdx].byteMatchCount=0;
-		m_topTen[m_topTenIdx].datSizeCount = theApp.m_datZipList[datPtr].numBytes;
-		m_topTen[m_topTenIdx].zipCount = theApp.m_nFileCount;
-
-		thisHit = m_topTenIdx;
-		if (m_topTenIdx < (TOPARRAYSIZE - 1))
-			m_topTenIdx++;
-	}
-
-	return thisHit;	// return index of this zip filename in the top ten array
-#endif
-	return 0;
-}
 
 void CDOSCenterDlg::sortTopTen()
 {
@@ -1212,22 +882,16 @@ int CDOSCenterDlg::scanAZipFile(CString sourceFile, int &matches, int &missing, 
 	unknown = 0;
 	int datIndex = -1;
 	int fileCount;
-	int totalBytes;
-	unsigned long long collisionCount;
-//	unsigned long long preCollisionCheckMask = 0;
+	int filesize;
+	//int skipped=0;
+	int collisionCount;
 	int datPtr, olddatPtr=0;
 	m_exactMatches=0;
 	m_zipCRCmatches=0;
 	int ignoreBytes=0;
 	int files2scan;
-	unsigned long long crcsize;
-	//_DATFILESTRUC zipMap;
-
-	CZipArchive zip;
-	ZIP_INDEX_TYPE index;
+	unsigned long long crcsize = 0;
 	CSettingsandTools CnT;
-
-
 
 
 	//         datPtr	     info
@@ -1235,222 +899,75 @@ int CDOSCenterDlg::scanAZipFile(CString sourceFile, int &matches, int &missing, 
 	std::map<unsigned int, _BESTHITS2>::const_iterator bpit;	// an iterator
 
 
-	if (!zip.Open(m_SourcePath + sourceFile))
-	{
-		if (!theApp.m_quietmode)
-			AfxMessageBox(L"There's something goofy with this file. - can't open it!\r\n" + sourceFile, MB_ICONWARNING, 0);
-		return 0;
-	}
-
-	// get number of files in zip
-//	zipMap.filename = zipFilename;
-	fileCount = zip.GetCount();
-	totalBytes = 0;
-
-
+	// then I can update status on it/roms directly.
+	zip2map2(m_SourcePath + sourceFile);
 
 	// for each rom in the actual zip...
-	// load them into a temporary map so we can check 'em against the .dat
-	for (index = 0; index < zip.GetCount(); index++)
+	fileCount = theApp.m_zipMap[0].fileCount;
+	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
+	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
 	{
-		// store the roms in a scratch cmap
-		//if (GetZipItemW(m_uz, i, &info) != ZR_OK)
-		//	break;
+		filesize = theApp.m_zipMap[0].it->second.size;
+		crcsize = filesize;
+		crcsize = (unsigned long long)(crcsize << 32);
+		crcsize |= theApp.m_zipMap[0].it->second.crc;
 
-		crcsize = zip[index]->m_uCrc32 + zip[index]->m_uUncomprSize;
-		totalBytes += zip[index]->m_uUncomprSize;
-		romName = zip[index]->GetFileName();
+		//totalBytes += filesize;
+		romName = theApp.m_zipMap[0].it->second.name;
 
-		// zip may not have DOS based folder structure, fix that here.
-		romName.Replace('/', '\\');
 
-		// strip out incoming zip folder if files are buried.
-		if (!m_buriedZipFolder.IsEmpty())
+		// is this roms's CRC found anywhere in the dat?
+		if (theApp.m_crcMap.count(crcsize) != 0)
 		{
-			romName.Replace(m_buriedZipFolder, L"");
-		}
-
-		
-		/*
-		special handling for folders.
-		SOME zip files do folders like this:
-		
-		file1.exe
-		folder\file2.exe
-
-		where some do it like this:
-
-		file1.exe
-		folder\
-		folder\file2.exe
-
-		the .dat file will also have a mixture of both since it apparently depends on the zip compressor as to how this is handled.
-		this causes confusion in scanning because if there will be a unique entry for "folder\" with a CRC size of 0 if it exists, which
-		may or may not match what is in the .dat file.
-
-		*/
-
-		// if CRC is 0, create a fake CRC based off the filename. This non-CRCable files to still be uniquely identified.
-		if ((crcsize == 0))
-		{
-			if (romName.Right(1) == '\\') // is this a folder only?  Skipit.
-				continue;
-			romName = romName.MakeLower();
-			crcsize = CnT.hashAString((CT2A)romName, 0);
-		}
-		collisionCount = 0;
-
-		// this skips over any crc collisions inside the zip itself.  They will automatically get processed during the 1st file.
-//		if ((crcsize & preCollisionCheckMask) != 0)
-//			crcsize = -1;
-		olddatPtr = -1;
-		while (theApp.m_datMap.CRCMap.count(crcsize) == 1) // CRC found somewhere in the .dat file?
-		{
-
-			//			zipMap.CRCMap[crcsize].status |= STATUS_CRC_MATCH;
-			datPtr = theApp.m_datMap.CRCMap[crcsize]; // .datPtr;
-			// if we just found this file in the same dat entry, don't count it again.
-			if (datPtr != olddatPtr)
+			int prevEntry = -1;
+			std::vector<unsigned int>::iterator datPtrit;
+			datPtrit = theApp.m_crcMap[crcsize].datPtr.begin();
+			collisionCount = theApp.m_crcMap[crcsize].collisionCount;
+			do 
 			{
-				olddatPtr = datPtr;
-
-				if (bestPicks.count(datPtr)) // already in the best picks list?
+				datPtr = *datPtrit;
+				// if the new datPtr is the same as the old one, that means this CRC collision is inside the same file, so break out of this loop.
+				if (datPtr != prevEntry)
 				{
-					bestPicks[datPtr].matchCount++;
-				}
-				else // first entry
-				{
-					bestPicks[datPtr].matchCount = 1;
-					bestPicks[datPtr].datSizeCount = theApp.m_datZipList[datPtr].numBytes;
-					bestPicks[datPtr].datCount = theApp.m_datZipList[datPtr].fileCount;
-					bestPicks[datPtr].byteMatchCount = 0;
-				}
+					CStringW f = theApp.m_datZipList[datPtr].filename; // debug
 
-				// update byte count tracker for this found object
-				bestPicks[datPtr].byteMatchCount += zip[index]->m_uUncomprSize;
-			}
-			// see if that was the one and only entry for that ROM
-			//int status = theApp.m_datMap.CRCMap[crcsize].status;
-			//if (theApp.m_datMap.CRCMap[crcsize].status & NEW_STATUS_COLLISION)
-			//{
-			// make a new key by simply incrementing a number outside of the possible max value of CRC+size
-			collisionCount++;
-			crcsize &= 0xfffffffff;
-			crcsize |= (collisionCount << COLLISION_COUNT_START_BIT);
-			//}
-			if (theApp.m_datMap.CRCMap.count(crcsize) == 0)
-				break;
-		}
-#if 0
-		//FileTimeToDosDateTime(&info.ctime, (LPWORD)&dosDate, (LPWORD)&dosTime);
+					// tag that we've found this rom...
+					//theApp.m_zipMap[0].ROMmap[romName].status |= STATUS_CRC_MATCH;
 
-		// check for collisions along the way.		
-		collisionCount = 0;
-		while (zipMap.CRCMap.count(crcsize) == 1)
-		{
-			// CRCsize collision! make a note in the original entry
-			//zipMap.CRCMap[crcsize].status |= NEW_STATUS_COLLISION;
-			// make a new key by simply incrementing a number outside of the possible max value of CRC+size
-			collisionCount++;
-			crcsize &= 0xfffffffff;
-			//zipMap.CRCMap[crcsize].collsionCount = collisionCount;	// update the 1st ROM map entry with the new count
-			crcsize |= (collisionCount << COLLISION_COUNT_START_BIT);
-		}
+					if (bestPicks.count(datPtr)) // already in the best picks list?
+					{
+						bestPicks[datPtr].matchCount++;
+					}
+					else // first entry, pluck a few values from this dat entry.
+					{
+						bestPicks[datPtr].matchCount = 1;
+						bestPicks[datPtr].datSizeCount = theApp.m_datZipList[datPtr].numBytes;
+						bestPicks[datPtr].datCount = theApp.m_datZipList[datPtr].fileCount;
+						bestPicks[datPtr].byteMatchCount = 0;
+					}
 
-		zipMap.CRCMap[crcsize] = 1;  // just make an entry for this CRC
-#endif
-		// fresh location to store the ROM info
-		//!!		zipMap.CRCMap[crcsize].date = (dosDate << 16) + dosTime;
-		//!!		zipMap.CRCMap[crcsize].crc = crc;
-		//!!zipMap.CRCMap[crcsize].size = size;
-		//!!zipMap.CRCMap[crcsize].name = info.name;
-		//!!zipMap.CRCMap[crcsize].status = 0;
+					// update byte count tracker for this found object
+					bestPicks[datPtr].byteMatchCount += filesize;
+				} // this isn't the same dat entry.
+				collisionCount--;
+				prevEntry = datPtr;
+				datPtrit++;
+			} while (collisionCount >= 0);
+		} // if crc found
+		theApp.m_zipMap[0].it++;
 	}
-//	zipMap.count = index;
-	zip.Close();
-
-
-
-
-
-#if 0
-	// build a mask to clear out collision status
-	preCollisionCheckMask = 0xfff;
-	preCollisionCheckMask = preCollisionCheckMask << COLLISION_COUNT_START_BIT;
-
-	// load zip into a cmap
-	//zip2map2(m_SourcePath + sourceFile);
-
-	zip2_crcmap(m_SourcePath + sourceFile, zipMap);
-	
-	
-	// now check each file in the zip against the .dat.  
-	zipMap.it = zipMap.CRCMap.begin();
-	while (zipMap.it != zipMap.CRCMap.end())
-	{
-		collisionCount = 0;
-		crcsize = zipMap.it->first;
-		// this skips over any crc collisions inside the zip itself.  They will automatically get processed during the 1st file.
-		if ((crcsize & preCollisionCheckMask) != 0)
-			crcsize = -1;
-
-//		filename = zipMap.it->second.name;
-		
-		while (theApp.m_datMap.CRCMap.count(crcsize) == 1) // CRC found somewhere in the .dat file?
-		{
-			
-//			zipMap.CRCMap[crcsize].status |= STATUS_CRC_MATCH;
-			datPtr = theApp.m_datMap.CRCMap[crcsize]; // .datPtr;
-
-			if (bestPicks.count(datPtr)) // already in the best picks list?
-			{
-				bestPicks[datPtr].matchCount++;
-			}
-			else // first entry
-			{
-				bestPicks[datPtr].matchCount = 1;
-				bestPicks[datPtr].datSizeCount = theApp.m_datZipList[datPtr].numBytes;
-				bestPicks[datPtr].datCount = theApp.m_datZipList[datPtr].fileCount;
-				bestPicks[datPtr].byteMatchCount = 0;
-			}
-
-			// update byte count tracker for this found object
-   		    bestPicks[datPtr].byteMatchCount += theApp.m_datMap.CRCMap[crcsize].size;
-
-			// see if that was the one and only entry for that ROM
-			//int status = theApp.m_datMap.CRCMap[crcsize].status;
-			//if (theApp.m_datMap.CRCMap[crcsize].status & NEW_STATUS_COLLISION)
-			//{
-				// make a new key by simply incrementing a number outside of the possible max value of CRC+size
-			collisionCount++;
-			crcsize &= 0xfffffffff;
-			crcsize |= (collisionCount << COLLISION_COUNT_START_BIT);
-			//}
-			if (theApp.m_datMap.CRCMap.count(crcsize) == 0)
-				break;
-		}
-
-		//findDatMatch(crcsize, filename);
-
-		// check to see if we can abandon scanning after 50 files
-		//			if ( ((i>0) && (i % 50) == 0))
-		//			{
-		//				sortTopTen();
-		//				if ( (m_topTen[1].zipScore - m_topTen[0].zipScore) > (float)0.5)
-		//					break;
-		//			}
-		zipMap.it++;
-	}
-#endif
-
-
-
 
 
 
 	// now build the score for possible matching .dat entry
 	float highscore = 0.0;
 	bpit = bestPicks.begin();
+
+	int ignoredFiles = theApp.m_zipMap[0].skippedFiles;
+	int ignoredBytes = theApp.m_zipMap[0].skippedFilesSize;
+
+	// if any "files" (folders as just folders) were skipped above, remove them from the overall count since these don't exist in the .dat file either.
+	//fileCount -= skipped;
 	while (bpit != bestPicks.end())
 	{
 		CStringW f = theApp.m_datZipList[bpit->first].filename;
@@ -1462,9 +979,9 @@ int CDOSCenterDlg::scanAZipFile(CString sourceFile, int &matches, int &missing, 
 		if (score2 > 1.0)	// 1/x function
 			score2 = (float)bpit->second.datSizeCount / (float)bpit->second.byteMatchCount;
 		
-		float score3 = (float)bpit->second.byteMatchCount / (float)totalBytes;
+		float score3 = (float)bpit->second.byteMatchCount / (float)theApp.m_zipMap[0].totalBytes;
 		if (score3 > 1.0)	// 1/x function
-			score3 = (float)totalBytes / (float)bpit->second.byteMatchCount;
+			score3 = (float)theApp.m_zipMap[0].totalBytes / (float)bpit->second.byteMatchCount;
 
 		float score4 = (float)bpit->second.datCount / (float)fileCount;
 		if (score4 > 1.0)	// 1/x function
@@ -1708,7 +1225,6 @@ void CDOSCenterDlg::OnNMDblclkZipFileList(NMHDR *pNMHDR, LRESULT *pResult)
 
 	theApp.m_zipIsFoldered = false;
 
-
 	int nIndex;
 	CString zipfilename;
 
@@ -1775,28 +1291,32 @@ void CDOSCenterDlg::OnNMDblclkZipFileList(NMHDR *pNMHDR, LRESULT *pResult)
 	// could have a filename match, but the CRC is different (common)
 
 
-	zipDir = findRootZipFolder();
-	if (zipDir.GetLength() > 0)
+
+	if (m_buriedZipFolder.GetLength() > 0)
 	{
-		theApp.m_zipDetailsList.AddItem(COLOR_PBROWN,L"Warning, all files inside folder", zipDir, "", "", "");	// add a note
+		theApp.m_zipDetailsList.AddItem(COLOR_PBROWN, L"Warning, all files inside folder", m_buriedZipFolder, "", "", "");	// add a note
 		theApp.m_zipIsFoldered = true;
-		m_buriedZipFolder = zipDir;
+		//m_buriedZipFolder = zipDir;
 	}
 
-
-	if (!showOnly)
+	if (!showOnly)	// this means we've scanned this file and can show colors compared to just a black listing.
 	{
 		compareDat2Zip(datPos, theApp.m_nFileCount, false);	// compare .dat entry to rom files
 		theApp.m_tmpzipList[0].ptr2zipFileArray = datPos;
 	}
-	
+
 
 	// now display each ROM
 	// the color shown is dependent on the various bits set in the status field.
 	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
 	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
 	{
-		status = theApp.m_zipMap[0].it->second.status; // tmp so I can see the goddamn variable
+		status = theApp.m_zipMap[0].it->second.status;
+		if ((status & STATUS_ROM_MISSING) == STATUS_ROM_MISSING) // display missing roms later on.
+		{
+			theApp.m_zipMap[0].it++;
+			continue;
+		}
 		filename = theApp.m_zipMap[0].it->second.name;
 		size.Format(L"%d", theApp.m_zipMap[0].it->second.size);
 		crc.Format(L"%08x", theApp.m_zipMap[0].it->second.crc);
@@ -1806,20 +1326,41 @@ void CDOSCenterDlg::OnNMDblclkZipFileList(NMHDR *pNMHDR, LRESULT *pResult)
 		date = time.Format("%Y/%m/%d %H:%M:%S");
 		ext = extractExtension(filename);
 
-		// skip blank folder names
-		if ((theApp.m_zipMap[0].it->second.crc != 0) || (filename.Right(1) != '\\'))
+#if 0
+		if ((status == 0) && (!showOnly)) // unknown file (for this dat) but it may exist elsewhere.  quick look it up.
 		{
-			// check if the user wants to hide these files
-			color = status_to_color(status);
-			if ((status & STATUS_CRC_MATCH) && ((CButton*)GetDlgItem(IDC_HIDEMATCHES))->GetCheck())	// does the user want to see these items?
-				color = COLOR_HIDE;
-
-			if ((status == 0) && ((CButton*)GetDlgItem(IDC_HIDEUNKNOWN))->GetCheck())	// does the user want to see these items?
-				color = COLOR_HIDE;
-
-			if (color != COLOR_HIDE)
-				theApp.m_zipDetailsList.AddItem(color, filename, ext, size, date, crc);	// add this entry to the list
+			unsigned int c = theApp.m_zipMap[0].it->second.crc;
+			if (theApp.m_crcMap.count(c) != 0)
+			{// CRC hit?
+				std::vector<unsigned int>::iterator datPtrit;
+				datPtrit = theApp.m_crcMap[c].datPtr.begin();
+				int datPtr = *datPtrit;
+				CStringW zipName = theApp.m_datZipList[datPtr].filename; // debug
+				
+				//theApp.m_datZipListit = theApp.m_datZipList.find(lookupROMdata.ptr2zipFileArray);
+				//CStringW zipName = theApp.m_datZipListit->second.filename;	// 2nd element is the 2nd thing stored in this map. weird stuff.
+				//theApp.m_tmpzipList[i].newFileName = zipName;
+				status |= STATUS_ROM_ELSEWHERE;
+				//theApp.m_tmpzipList[i].ptr2zipFileArray = lookupROMdata.ptr2zipFileArray;
+				//color = COLOR_PURPLE;
+			}
 		}
+#endif
+
+		color = status2color(status);
+
+		// check if the user wants to hide these files
+		// hide matching CRCs?
+		if (((status & STATUS_CRC_MATCH) == STATUS_CRC_MATCH ) && ((CButton*)GetDlgItem(IDC_HIDEMATCHES))->GetCheck())
+			color = COLOR_HIDE;
+		// hide unknown files?
+		if ((status == 0) && ((CButton*)GetDlgItem(IDC_HIDEUNKNOWN))->GetCheck())
+			color = COLOR_HIDE;
+		
+		// add this file to the output box.
+		if (color != COLOR_HIDE)
+			theApp.m_zipDetailsList.AddItem(color, filename, ext, size, date, crc);	// add this entry to the list
+
 		theApp.m_zipMap[0].it++;
 	}
 
@@ -1871,29 +1412,45 @@ void CDOSCenterDlg::OnNMDblclkZipFileList(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 #endif	
 	if ( (showOnly) || ((CButton*)GetDlgItem(IDC_HIDEMISSING))->GetCheck() ) // only if the user wants this stuff
-		goto exit;
+		goto exit;	// yep I just did that.
 
 	////////////////
-	// display missing files - anything in the .dat that we have not discovered in the physical zip
+	// display missing files - anything in the .dat that we have not discovered in the physical zip  
 	////////////////
-	
-	
-	for (int j=0; j<theApp.m_datZipList[datPos].fileCount; j++)
+	// missing files have been injected in the zipMap to make it easier to display.
+	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
+	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
 	{
+		status = theApp.m_zipMap[0].it->second.status;
+		if ((status & STATUS_ROM_MISSING) != STATUS_ROM_MISSING)
+		{
+			theApp.m_zipMap[0].it++;
+			continue;
+		}
+		// put it in the list
+		color = status2color(status);
+		filename = theApp.m_zipMap[0].it->second.name;
+		ext = extractExtension(filename);
+		size.Format(L"%d", theApp.m_zipMap[0].it->second.size);
+		crc.Format(L"%08x", theApp.m_zipMap[0].it->second.crc);
+		dosDate = (WORD)(theApp.m_zipMap[0].it->second.date >> 16);
+		dosTime = (WORD)theApp.m_zipMap[0].it->second.date & 0xffff;
+		CTime time(dosDate, dosTime);
+		date = time.Format("%Y/%m/%d %H:%M:%S");
+		if (!filename.IsEmpty())
+			theApp.m_zipDetailsList.AddItem(color, filename, ext, size, date, crc);	// add this entry to the list
+		theApp.m_zipMap[0].it++;
+	}
+
+
+
+#if 0
+	{
+
 		int g = theApp.m_datZipList[datPos].ROMsMap[j].status;
 		if ( (g != 0) && (g != STATUS_ROM_IGNORED) )
 			continue;
 		
-		color = COLOR_RED;
-		filename = theApp.m_datZipList[datPos].ROMsMap[j].name;
-		size.Format(L"%d", theApp.m_datZipList[datPos].ROMsMap[j].size);	
-		crc.Format(L"%08x", theApp.m_datZipList[datPos].ROMsMap[j].crc);
-		dosDate = (WORD)(theApp.m_datZipList[datPos].ROMsMap[j].date >> 16);
-		dosTime = (WORD)theApp.m_datZipList[datPos].ROMsMap[j].date & 0xffff;
-		CTime time(dosDate, dosTime);
-		date =time.Format( "%Y/%m/%d %H:%M:%S" );
-		ext = extractExtension(filename);
-
 		// hang on pardner.  if this file is in our ignore list, it's not really missing. 
 		//if (skipafile(filename, ext, theApp.m_datZipList[datPos].ROMsMap[j].crc, theApp.m_datZipList[datPos].ROMsMap[j].size))
 		
@@ -1905,6 +1462,8 @@ void CDOSCenterDlg::OnNMDblclkZipFileList(NMHDR *pNMHDR, LRESULT *pResult)
 		if (!filename.IsEmpty())
 			theApp.m_zipDetailsList.AddItem(color,filename, ext, size, date, crc);	// add this entry to the list
 	}
+#endif
+
 
 	// clean up our .dat entry
 	for (int j=0; j<theApp.m_datZipList[datPos].fileCount; j++)
@@ -2203,6 +1762,7 @@ void CDOSCenterDlg::add2database()
 	unsigned int size, date;
 	CString name, scrc, tmp;
 	CString color;
+	bool results;
 
 	CString f= theApp.m_datZipList[theApp.m_datfileCount].filename;
 	theApp.m_datZipList[theApp.m_datfileCount].filename= theApp.m_currentlyTaggedZipFile;	// store the zip filename inside the structure inside the map.
@@ -2226,11 +1786,12 @@ void CDOSCenterDlg::add2database()
 			tmp = theApp.m_zipDetailsList.GetItemText(count,3);	// size
 			swscanf_s(tmp,L"%x",&size);	
 			date = CnT.String2Date(theApp.m_zipDetailsList.GetItemText(count,4)); //date
-			CnT.rom2datmap(name, size, 0, true, date, scrc, theApp.m_datfileCount, count);	
+			results = CnT.rom2datmap(name, size, 0, true, date, scrc, count);	
 		}
 	
 		tmp = theApp.m_zipDetailsList.GetItemText(count,0);
-		count++;
+		if (results)
+			count++;
 		if (tmp.GetLength() == 0)
 			break;
 		
@@ -2454,7 +2015,9 @@ void CDOSCenterDlg::deleteFileFromZip()
 		if (nIndex == -1)
 			break;
 		tmp = theApp.m_zipDetailsList.GetItemText(nIndex, FILENAMECOL);
-		tmp += L"." + theApp.m_zipDetailsList.GetItemText(nIndex, 2);
+		ext = theApp.m_zipDetailsList.GetItemText(nIndex, 2);
+		if (ext.GetLength() > 0)
+			tmp += L"." + ext;
 
 		ZIP_INDEX_TYPE index = zip.FindFile(tmp);
 
@@ -2464,16 +2027,12 @@ void CDOSCenterDlg::deleteFileFromZip()
 		zip.Close();
 }
 
+
 // move all files in a zip file up 1 level. 
-//TODO - convert to ZipArchive.  might be able to un-nest a zip simply by renaming the files inside it
 void CDOSCenterDlg::unNestZipFile()
 {
 	CString dest;
 	int nIndex=-1;
-//	int	m_nFileCount;
-//	UZ_FileInfo info;
-	ZIPMERGE* zipMerge;
-	zipMerge = new _ZIPMERGE[1];	
 	CString zipfilename;
 	CString filename;	// rom filename
 	CString targetZipName;
@@ -2493,15 +2052,15 @@ void CDOSCenterDlg::unNestZipFile()
 	targetZipName = theApp.extractFilenameWOPath(targetZipName);
 	targetZipName.Insert(0,L"WIP");
 
-	zip2map(m_SourcePath+zipfilename);
+	zip2map2(m_SourcePath+zipfilename);
 	// get the name of the root folder that we're about to elimate
-	zipDir = findRootZipFolder();
+	zipDir = m_buriedZipFolder; // findRootZipFolder();
 
 	if (zipDir.GetLength() == 0)
 	{
 		AfxMessageBox(L"Not all files are buried", MB_ICONWARNING, 0);
 		progDlg.DestroyWindow();
-		delete[] zipMerge;
+		//delete[] zipMerge;
 		return;
 	}
 
@@ -2516,31 +2075,10 @@ void CDOSCenterDlg::unNestZipFile()
 			// delete temporary work space
 			if (!files.DeleteDirectory(theApp.m_tmpWorkingFolder+L"\\DOSCenterUz\\"))
 				AfxMessageBox(L"Warning, unable to clean up temporary working folder.\r\n"+theApp.m_tmpWorkingFolder , MB_ICONWARNING, 0);
-			delete[] zipMerge;
+			//delete[] zipMerge;
 			progDlg.DestroyWindow();
 			return;
 		}
-
-/* TODO do I need this? - maybe to validate all the files made it to the new zip?
-	// put all files inside this zip into the array
-	m_uz.OpenZip(m_SourcePath+zipfilename);
-	m_uz.GotoFirstFile();
-	m_uz.GetFileInfo(info);
-	m_nFileCount = m_uz.GetFileCount();
-
-	for (int i=0; i<m_nFileCount; i++)	// for each file in the zip...
-		{
-			filename = info.szFileName;
-			filename = filename.Right(filename.GetLength() - zipDir.GetLength());
-			// add filename or new filename into array
-			if (filename.GetLength() > 0)
-				zipMerge[0].ROMmap[filename].name = filename;
-			m_uz.GotoNextFile();
-			m_uz.GetFileInfo(info);
-        }
-	m_uz.CloseZip();
-*/
-
 
 	// zip it all back up.
 	progDlg.UpdateText(L"Creating new zip:"+targetZipName);
@@ -2551,402 +2089,127 @@ void CDOSCenterDlg::unNestZipFile()
 		//bad zip file created!
 	}
 
-/*
-	zipMerge[0].it = zipMerge[0].ROMmap.begin();
-			while( zipMerge[0].it != zipMerge[0].ROMmap.end() ) 
+	// copy the global zip map over to a temp map so we can compare the new zip against the old one.
+	std::map<CStringW, int> tmpROMmap;	// storage, make the filename the key
+	std::map<CStringW, int>::const_iterator it;	// an iterator
+
+	CStringW romfilenameZip;
+
+	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
+	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
+	{
+		romfilenameZip = theApp.m_zipMap[0].it->second.name;	// get updated raw rom name from the zip and keep track of it for later.
+		if (romfilenameZip.GetLength())
+		{
+			//romfilenameZip.TrimLeft(zipDir);
+			tmpROMmap[romfilenameZip] = 1;
+		}
+		theApp.m_zipMap[0].it++;
+	}
+
+	zip2map2(m_SourcePath + targetZipName, true);
+
+	// compare to temp map
+	bool badzip = false;
+	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
+	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
+	{
+		romfilenameZip = theApp.m_zipMap[0].it->second.name;	// get updated raw rom name from the zip and keep track of it for later.
+		if (romfilenameZip.GetLength())
+		{
+			if (tmpROMmap.count(romfilenameZip)==0)
 			{
-				filename = theApp.m_tmpWorkingFolder+"\\DOSCenterUz\\"+zipDir+zipMerge[0].it->first;
-				m_zip.AddFileToZip(filename);
-				zipMerge[0].it++;
+				badzip = true;
+				break;
 			}
-*/
+		}
+		theApp.m_zipMap[0].it++;
+	}
 
 
+	if (badzip)
+	{
+		AfxMessageBox(L"Error, two zip files are not equal.\r\n", MB_ICONWARNING, 0);
+		SetCurrentDirectory(theApp.m_tmpWorkingFolder);
+		remove((CT2CA)(m_SourcePath + targetZipName));
+	}
+	else
+	{
+		SetCurrentDirectory(theApp.m_tmpWorkingFolder);
+		remove((CT2CA)(m_SourcePath + zipfilename));
+		MoveFile(m_SourcePath + targetZipName, m_SourcePath + zipfilename);
+	}
 
 	// delete the original file, move the new one back in.
 	progDlg.UpdateText(L"Cleaning up...");
-	SetCurrentDirectory(theApp.m_tmpWorkingFolder);	
-	remove((CT2CA)(m_SourcePath+zipfilename));
-	MoveFile(m_SourcePath+targetZipName, m_SourcePath+zipfilename);
-
 	// delete temporary work space
 	if (!files.DeleteDirectory(theApp.m_tmpWorkingFolder+L"\\DOSCenterUz\\"))
 		AfxMessageBox(L"Warning, unable to clean up DOSCenter temporary working folder.\r\n"+theApp.m_tmpWorkingFolder , MB_ICONWARNING, 0);
 
 
 	OnNMDblclkZipFileList(0, 0);
-	delete[] zipMerge;
+	//delete[] zipMerge;
 	progDlg.DestroyWindow();
 	return;
 }
 
-// returns a CString of the folder that all files are contained in.
-// ideally, this would return "\" or just a null string, but a LOT of zip files now are showing up as:
-// \game name\files or
-// \game name\game name\files
-// this uses the global unzip map: theApp.m_tmpzipList so call zip2map prior
-CStringW CDOSCenterDlg::findRootZipFolder()
-{
-	CString zipDir=L"";
-	CString folder, tmp;
-
-	if (theApp.m_nFileCount == 0)
-		return zipDir;
-
-	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
-	// get the first file's folder
-	folder = theApp.m_zipMap[0].it->second.name;
-	if (folder.Find('\\') == -1)
-		return zipDir;	// bail if we've ever found no folders
-
-	// ok, first file is inside a folder, get the name of it
-	folder = folder.Left(folder.Find('\\') + 1);
-	zipDir = folder;
-
-	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
-	{
-		tmp = theApp.m_zipMap[0].it->second.name;
-		if (tmp.Left(folder.GetLength()) != folder)
-		{
-			zipDir = L"";
-			break;
-		}
-		theApp.m_zipMap[0].it++;
-	}
-
-	return zipDir;
-}
-
-// compare a .dat entry against files in a given zip
-// update the status of each as we find them
-// global map "m_ROMsInZip" has been populated with contents of zip file.
-// datPOS points to the .dat entry we're validating against.
-void CDOSCenterDlg::checkDatvsZip(int datPos, DATFILESTRUC &zipMap, bool cleanup)
-{
-	m_zipCRCmatches=0;
-	m_exactMatches=0;
-
-	CString romfilename, datfilename;
-	int status;
-	int ptr;
-
-
-
-
-//	theApp.m_datMap.it = theApp.m_datMap.CRCMap.begin();
-//	while (theApp.m_datMap.it != theApp.m_datMap.CRCMap.end())
-//	{
-//		romfilename = theApp.m_datMap.it->second.name;
-//		//romfilename = theApp.m_datMap[datPos].CRCMap[0].name;
-//	}
-
-	// once we're down to a single dat entry and a zip file, the _filename_ is now the unique portion
-	for (int j = 0; j < theApp.m_datZipList[datPos].fileCount; j++) // for every entry in the .dat file
-	{
-		// need to do lowercase and uppercase here.
-		romfilename = theApp.m_datZipList[datPos].ROMsMap[j].name;
-		romfilename.MakeLower();
-		if ((theApp.m_ROMsInZip.Lookup(romfilename, ptr)) || (theApp.m_ROMsInZip.Lookup(theApp.m_datZipList[datPos].ROMsMap[j].name, ptr)))
-		{
-			status = STATUS_FILENAME_MATCH;	
-			if (theApp.m_datZipList[datPos].ROMsMap[j].crc == theApp.m_tmpzipList[ptr].crc)
-			{
-				status |= STATUS_CRC_MATCH;
-			}
-			if (theApp.m_datZipList[datPos].ROMsMap[j].size == theApp.m_tmpzipList[ptr].size)
-			{
-				status |= STATUS_SIZE_MATCH;
-			}
-			if (1) // someday we will check timestamps too.
-			{
-				status |= STATUS_TIMESTAMP_MATCH;
-			}
-			// add other qualifiers here, like case being wrong.  
-			if (theApp.m_datZipList[datPos].ROMsMap[j].name != theApp.m_tmpzipList[ptr].fileName)
-			{
-				status |= STATUS_ROM_WRONGCASE;
-			}
-			theApp.m_datZipList[datPos].ROMsMap[j].status = status;
-			theApp.m_tmpzipList[ptr].status = status;
-			// transfer over a few misc statusesses to the zip file
-
-			// check for torrentzip .dat entry 
-			if (theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_TZIPPED)
-			{
-				theApp.m_tmpzipList[ptr].status |= STATUS_ROM_TZIPPED;
-			}
-			// is this rom also found in other dat entries?
-			if (theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_ELSEWHERE)
-			{
-				theApp.m_tmpzipList[ptr].status |= STATUS_ROM_ELSEWHERE;
-			}
-		
-			if ((theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_PERFECT_MATCH) == STATUS_ROM_PERFECT_MATCH)
-				m_exactMatches++;
-			else if ((theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_CRC_MATCH) == STATUS_CRC_MATCH)
-				m_zipCRCmatches++;
-		}
-		// no filename match.  check the CRC.
-
-		// see if this file is to be ignored.
-//		if (skipafile(tmpfilename, ext, theApp.m_datZipList[datPos].ROMsMap[j].crc, theApp.m_datZipList[datPos].ROMsMap[j].size))
-//		{
-//			m_datIgnored++;
-//			//theApp.m_tmpzipList[i].status = STATUS_ROM_IGNORED;
-//			theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_ROM_IGNORED;
-//		}
-
-
-	}
-
-
-/*
-	}
-
-
-	// faster than this? -yes.
-	int i;
-	for (i = 0; i < m_nFileCount; i++)
-	{
-		if ((romfilename == theApp.m_tmpzipList[i].fileName) || (theApp.m_datZipList[datPos].ROMsMap[j].name == theApp.m_tmpzipList[i].fileName))
-			break;
-	}
-	if (theApp.m_tmpzipList[i].crc == theApp.m_datZipList[datPos].ROMsMap[j].crc)
-	{
-		theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_CRC_MATCH;
-	}
-	if (theApp.m_tmpzipList[i].size == theApp.m_datZipList[datPos].ROMsMap[j].size)
-	{
-		theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_SIZE_MATCH;
-	}
-	if (1) // someday we will check timestamps too.
-	{
-		theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_TIMESTAMP_MATCH;
-	}
-
-	*/
-
-	//	tempROMdata.ptr2zipFileArray =
-
-	// get the status for each "rom" (file in zip) as to compared to the .dat file
-//	for (int i = 0; i < m_nFileCount; i++)
-//	{
-//		theApp.m_tmpzipList[i].status = datMatch(datPos, theApp.m_tmpzipList[i].fileName, theApp.m_tmpzipList[i].crc, theApp.m_tmpzipList[i].date, theApp.m_tmpzipList[i].size);
-//		if (theApp.m_tmpzipList[i].status == STATUS_ROM_PERFECT_MATCH)
-//			m_exactMatches++;
-//		else if ( (theApp.m_tmpzipList[i].status & STATUS_CRC_MATCH) == STATUS_CRC_MATCH)
-//			m_zipCRCmatches++;
-//	}
-/*		if (theApp.m_tmpzipList[i].crc != 0)
-		{
-			romfilename = theApp.m_tmpzipList[i].fileName;
-			for (int j=0; j<theApp.m_datZipList[datPos].fileCount; j++)
-				if (theApp.m_datZipList[datPos].ROMsMap[j].status ==0)	// if already checked the .dat rom, skipit
-				{
-					datfilename = theApp.m_datZipList[datPos].ROMsMap[j].name;
-					if (theApp.m_tmpzipList[i].crc == theApp.m_datZipList[datPos].ROMsMap[j].crc)	// crc match?
-					{
-						if (theApp.m_tmpzipList[i].fileName == theApp.m_datZipList[datPos].ROMsMap[j].name) // name match too?
-						{
-							//if (theApp.m_tmpzipList[i].date == theApp.m_datZipList[datPos].ROMsMap[j].date) // timestamp match!? - future work
-							{
-								m_exactMatches++;
-								theApp.m_tmpzipList[i].status = STATUS_ROM_PERFECT_MATCH;
-								theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_ROM_PERFECT_MATCH;
-								break;
-							} // timestamp match
-						} //name match
-						else	// may be a case issue.  
-							if (romfilename.MakeLower() == datfilename.MakeLower())
-							{
-								m_exactMatches++;
-								theApp.m_tmpzipList[i].status = STATUS_ROM_PERFECT_MATCH;	//todo - set to STATUS_ROM_NAMEWEIRD
-								theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_ROM_PERFECT_MATCH;
-								break;
-							}
-							else	// may be a buried zip
-							{
-								if (!m_buriedZipFolder.IsEmpty())
-								{
-									romfilename.Replace(m_buriedZipFolder.MakeLower(), L"");
-									if (romfilename == datfilename)
-									{
-										m_exactMatches++;
-										theApp.m_tmpzipList[i].status = STATUS_ROM_PERFECT_MATCH;	//todo - set to STATUS_ROM_NAMEWEIRD
-										theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_ROM_PERFECT_MATCH;
-									}
-								}
-						}
-				}
-			} // crc match
-		} // CRC non-zero
-	} // dat things we have not already checked
-	
-	// 2nd pass through the dat+zip
-	// now look for CRC matches but filename mismatches. (ie, game.exe has been renamed to play.exe, but the contents are the same)
-	// we don't do this as part of the above check because we can run into a situation where there are 2 files with the same CRC (different name) and as we're scanning
-	// we would end up marking off a CRC match+filename mismatch, but if we'd scanned a bit more, we'd catch a perfect match.
-	for (int i=0; i<m_nFileCount; i++) // ..for each rom
-	{
-		if ((theApp.m_tmpzipList[i].status & STATUS_ROM_PERFECT_MATCH) == STATUS_ROM_PERFECT_MATCH)	// if already zip rom found above, skipit
-			continue;
-		else
-		for (int j=0; j<theApp.m_datZipList[datPos].fileCount; j++) // ..and for each dat entry
-		{
-			if ((theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_PERFECT_MATCH) == STATUS_ROM_PERFECT_MATCH)	// if already checked the .dat rom, skipit
-				continue;
-			else
-			if (theApp.m_tmpzipList[i].crc == theApp.m_datZipList[datPos].ROMsMap[j].crc)	// CRC match? yay!
-			{	
-				//if (theApp.m_tmpzipList[i].date == theApp.m_datZipList[datPos].ROMsMap[j].date) // timestamp match!? - future work
-				m_zipCRCmatches++;
-				theApp.m_tmpzipList[i].status = STATUS_CRC_MATCH;
-				theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_CRC_MATCH;
-				theApp.m_tmpzipList[i].newFileName = theApp.m_datZipList[datPos].ROMsMap[j].name;	// save the name it should be
-				continue;
-			}
-		}
-	}
-
-	// 3rd pass
-	// now look for filename matches but CRC mismatches (.exe file has been hacked and no longer matches what the .dat file says)
-	// or the filename is in the ignore list.
-	for (int i=0; i<m_nFileCount; i++) // ..for each rom in the zip...
-	{
-		CString romfilename = theApp.m_tmpzipList[i].fileName;
-		if ((theApp.m_tmpzipList[i].status & STATUS_CRC_MATCH) == STATUS_CRC_MATCH)	// if zip rom already found anywhere above, skipit
-			continue;
-		// file in ignore list?
-		CString tmpfilename = romfilename; 
-		CString ext = extractExtension(tmpfilename);
-		if (skipafile(tmpfilename, ext, theApp.m_tmpzipList[i].crc, theApp.m_tmpzipList[i].size))
-		{
-			m_zipIgnored++;	
-			theApp.m_tmpzipList[i].status = STATUS_ROM_IGNORED;
-			continue;
-		}		
-
-		for (int j=0; j<theApp.m_datZipList[datPos].fileCount; j++) // ..and for each dat entry
-		{
-			CString datfilename = theApp.m_datZipList[datPos].ROMsMap[j].name;
-			if ((theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_CRC_MATCH) != STATUS_CRC_MATCH)	// if already checked the .dat rom, skipit
-			{				
-				if (theApp.m_tmpzipList[i].fileName == theApp.m_datZipList[datPos].ROMsMap[j].name)	// filename match? yay!
-				{
-					m_zipROMNameMatches++;
-					theApp.m_tmpzipList[i].status = STATUS_ROM_FILENAME_MATCH;
-					theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_ROM_FILENAME_MATCH;
-				//	if (theApp.m_tmpzipList[i].status = STATUS_ROM_IGNORED)	// was this file ignored already?
-				//		theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_ROM_IGNORED;
-					continue;
-				}
-				else // may be a case issue
-				if (romfilename.MakeLower() == datfilename.MakeLower())
-				{
-					m_zipROMNameMatches++;
-					theApp.m_tmpzipList[i].status = STATUS_ROM_FILENAME_MATCH;
-					theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_ROM_FILENAME_MATCH;
-				//	if (theApp.m_tmpzipList[i].status = STATUS_ROM_IGNORED)	// was this file ignored already?
-				//		theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_ROM_IGNORED;
-					continue;
-				}	
-				else	// may be buried
-				if (!m_buriedZipFolder.IsEmpty())
-				{
-					romfilename.Replace(m_buriedZipFolder.MakeLower(),L"");
-					if (romfilename == datfilename)
-					{
-						m_zipROMNameMatches++;
-						theApp.m_tmpzipList[i].status = STATUS_ROM_FILENAME_MATCH;
-						theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_ROM_FILENAME_MATCH;
-					//	if (theApp.m_tmpzipList[i].status = STATUS_ROM_IGNORED)	// was this file ignored already?
-					//		theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_ROM_IGNORED;
-						continue;
-					}
-				}
-			} // unchecked dat entries
-		} // each dat entry
-	} // each zip entry
-	*/
-
-	// Finally see if there is anything in the zip file that is on the ignore list.
-	// we've actually already CRC+filename matched everything anyway, so if something in the ignore list matched, it'll already be counted.
-	// this all is assuming the .dat file is more perfect than the zip file we're scanning, but that's kinda the point.
-//	for (int i=0; i<m_nFileCount; i++) // ..for each rom
-//	{
-//		if ((theApp.m_tmpzipList[i].status & STATUS_ROM_FILENAME_MATCH) == STATUS_ROM_FILENAME_MATCH)	// if already found, skipit
-//			continue;
-//		CString tmpfilename = theApp.m_tmpzipList[i].fileName;
-//		CString ext = extractExtension(tmpfilename);
-//		if (skipafile(tmpfilename, ext, theApp.m_tmpzipList[i].crc, theApp.m_tmpzipList[i].size))
-//		{
-//			m_exactMatches++;	
-	//		theApp.m_tmpzipList[i].status |= STATUS_ROM_IGNORED;
-			//theApp.m_datZipList[datPos].ROMsMap[j].status = STATUS_ROM_CRC_MATCH+STATUS_ROM_FILENAME_MATCH+STATUS_ROM_TIMESTAMP_MATCH;
-//		}
-//	}
-
-	// and check if there is anything in the .dat file that we didn't find in the zip that is on our ignore list. (like file_id.diz)
-//	for (int j=0; j<theApp.m_datZipList[datPos].fileCount; j++) // ..and for each dat entry
-//	{
-//		if (theApp.m_datZipList[datPos].ROMsMap[j].status != 0) 
-//			continue;
-		
-//		CStringW tmpfilename = theApp.m_datZipList[datPos].ROMsMap[j].name;
-//		CStringW ext = extractExtension(tmpfilename);
-//		if (skipafile(tmpfilename, ext, theApp.m_datZipList[datPos].ROMsMap[j].crc, theApp.m_datZipList[datPos].ROMsMap[j].size))
-//		{
-//			m_datIgnored++;	
-//			//theApp.m_tmpzipList[i].status = STATUS_ROM_IGNORED;
-//			theApp.m_datZipList[datPos].ROMsMap[j].status |= STATUS_ROM_IGNORED;
-//		}
-//	}
-
-	if (cleanup)
-	{
-		// cleanup the .dat map so we can scan it again
-		for (int j=0; j<theApp.m_datZipList[datPos].fileCount; j++) // ..and for each dat entry
-			theApp.m_datZipList[datPos].ROMsMap[j].status = 0;
-	}
-}
-
 // deep dive the zip file contents against the .dat entry.  Expose every detail we can about the files compared to the .dat
+// This primarily updates the zipmap status field for each entry in the zipMap but we're only going through the files in the dat entry.
+// the datMap is also updated so that we can output scan have/miss lists.
+// by passing in the datPos, this allows this routine to compare zip to any arbitrary dat entry.
 void CDOSCenterDlg::compareDat2Zip(int datPos, int m_nFileCount, bool cleanup)
 {
 	m_zipCRCmatches = 0;
 	m_exactMatches = 0;
 
-	CStringW lcaseROMfilename, tmp;
+	CStringW lcaseROMfilenameDat, tmp;
 	int status;
+	unsigned long long crcsize;
 	unsigned int crc;
-	theApp.m_zipMap[0].zipDatPtr = datPos; // may not be the best place for this?
-
-	// once we're down to a single dat entry and a zip file, the _filename_ is now the unique portion
+	CStringW romfilenameDat;
+	CStringW romfilenameZip;
+	
+	// in a zip file (and .dat entry) the _filename_ is the unique part. zips can have duplicate files with duplicate CRCs but cannot have duplicate filenames.
 	for (int j = 0; j < theApp.m_datZipList[datPos].fileCount; j++) // for every entry in the .dat file
 	{
 		status = 0;
-		theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.find(theApp.m_datZipList[datPos].ROMsMap[j].name);
-		if (theApp.m_zipMap[0].it == theApp.m_zipMap[0].ROMmap.end()) // not found?
-		{
-			// try case insenstive or CRC matching
-			lcaseROMfilename = theApp.m_datZipList[datPos].ROMsMap[j].name;
-			lcaseROMfilename.MakeLower();
-			crc = theApp.m_datZipList[datPos].ROMsMap[j].crc;
-			theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
+		
+		// get this ROM filename out of the dat
+		romfilenameDat = theApp.m_datZipList[datPos].ROMsMap[j].name;
+		romfilenameZip = romfilenameDat; // assume dat filename matches zip filename.
 
+		// 1st check for an exact match, case and everything.
+		theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.find(romfilenameDat);
+		if (theApp.m_zipMap[0].it == theApp.m_zipMap[0].ROMmap.end()) // not found? try case insenstive or CRC matching
+		{
+			lcaseROMfilenameDat = theApp.m_datZipList[datPos].ROMsMap[j].name;
+			lcaseROMfilenameDat.MakeLower();
+			crc = theApp.m_datZipList[datPos].ROMsMap[j].crc;
+
+			theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
 			while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
 			{
-				tmp = theApp.m_zipMap[0].it->second.name;
+				romfilenameZip = theApp.m_zipMap[0].it->second.name;	// get updated raw rom name from the zip and keep track of it for later.
+				tmp = romfilenameZip;
 				tmp.MakeLower();
-				if (tmp == lcaseROMfilename)
+				if (tmp == lcaseROMfilenameDat)	// wrong case?
+				{
+					status |= STATUS_ROM_WRONGCASE;
 					break;
-				if (theApp.m_zipMap[0].it->second.crc == crc)
+				}
+				if (theApp.m_zipMap[0].it->second.crc == crc) // CRC match? // this could burn us when zip has multiple files of the same CRC.
+				{
+					status |= STATUS_ROM_WRONGNAME;
+					theApp.m_zipMap[0].ROMmap[romfilenameZip].correctFilename = theApp.m_datZipList[datPos].ROMsMap[j].name; // tuck it away so the user can look at it later.
 					break;
+				}
+				
 				theApp.m_zipMap[0].it++;
 			}
 		}
-
-		if (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())  // we found something that matches
+		
+		// If we've found something that matches... filename, case insensitive filename or CRC32
+		if (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())  
 		{
 			if (theApp.m_zipMap[0].it->second.crc == theApp.m_datZipList[datPos].ROMsMap[j].crc)
 				status |= STATUS_CRC_MATCH;
@@ -2956,63 +2219,156 @@ void CDOSCenterDlg::compareDat2Zip(int datPos, int m_nFileCount, bool cleanup)
 				status |= STATUS_SIZE_MATCH;
 			if (theApp.m_zipMap[0].it->second.name == theApp.m_datZipList[datPos].ROMsMap[j].name)
 				status |= STATUS_FILENAME_MATCH;
-			else
+			else // we should have this status already from above
 			{
 				tmp = theApp.m_zipMap[0].it->second.name;
 				tmp.MakeLower();
-				if (tmp == lcaseROMfilename)
+				if (tmp == lcaseROMfilenameDat)
 				{
 					status |= STATUS_ROM_WRONGCASE;
-					tmp = theApp.m_zipMap[0].it->second.name;
-					theApp.m_zipMap[0].ROMmap[tmp].correctFilename = theApp.m_datZipList[datPos].ROMsMap[j].name;
+					//tmp = theApp.m_zipMap[0].it->second.name; // get the filename as was found in the .dat
+					theApp.m_zipMap[0].ROMmap[romfilenameZip].correctFilename = theApp.m_datZipList[datPos].ROMsMap[j].name; // tuck it away so the user can look at it later.
 				}
 			}
 
-			// transfer over a few misc statusesses to the zip file
+			// get some more status info from the .dat file
 			// check for torrentzip .dat entry 
 			if (theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_TZIPPED)
 				status |= STATUS_ROM_TZIPPED;
-			// is this rom also found in other dat entries?
-			if (theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_ELSEWHERE)
-				status |= STATUS_ROM_ELSEWHERE;
+			// is this rom also found in other dat entries? - not sure where that would be getting set.
+			//if (theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_ELSEWHERE)
+			//	status |= STATUS_ROM_ELSEWHERE;
 			
-
-			// add ignored files here
-
 			// update the status fields for both the .dat file and the romsmap (zip file)
 			tmp = theApp.m_zipMap[0].it->second.name;
-			theApp.m_zipMap[0].ROMmap[tmp].status = status;
-			theApp.m_datZipList[datPos].ROMsMap[j].status = status;
+			theApp.m_zipMap[0].ROMmap[romfilenameZip].status = status;
 
+			// should not be updating the .dat file at this level?
+			theApp.m_datZipList[datPos].ROMsMap[j].status = status;
 			if ((theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_ROM_PERFECT_MATCH) == STATUS_ROM_PERFECT_MATCH)
 				m_exactMatches++;
 			else if ((theApp.m_datZipList[datPos].ROMsMap[j].status & STATUS_CRC_MATCH) == STATUS_CRC_MATCH)
 				m_zipCRCmatches++;
 		}
+		else // this .dat entry is not found in this zip.  Make a fake entry in the zipmap - todo- if we matched filename but not CRC, we need to do this too.
+		{
+			// do some screening first to see if this is even something we care about.
+
+		//	if (theApp.m_zipMap[0].ROMmap[romfilenameDat].status & STATUS_ROM_SKIPPED == 0)
+		//	{
+				theApp.m_zipMap[0].ROMmap[romfilenameDat].name = romfilenameDat;  // don't even need this, since the filename is the index.
+				theApp.m_zipMap[0].ROMmap[romfilenameDat].size = theApp.m_datZipList[datPos].ROMsMap[j].size;
+				theApp.m_zipMap[0].ROMmap[romfilenameDat].crc = theApp.m_datZipList[datPos].ROMsMap[j].crc;
+				theApp.m_zipMap[0].ROMmap[romfilenameDat].status = STATUS_ROM_MISSING;
+				theApp.m_zipMap[0].ROMmap[romfilenameDat].date = theApp.m_datZipList[datPos].ROMsMap[j].date;
+				
+				// ok, a missing file has been detected.  is that file accounted for somewhere?
+				int datPtr = doesROMExistinDat(theApp.m_datZipList[datPos].ROMsMap[j].crc);
+				if ((datPtr != -1) && (datPtr != datPos))	// make sure we don't just point back to ourselves.
+				{
+					CStringW zipName = theApp.m_datZipList[datPtr].filename; // debug
+					theApp.m_zipMap[0].ROMmap[romfilenameDat].status |= STATUS_ROM_ELSEWHERE;
+					theApp.m_zipMap[0].ROMmap[romfilenameDat].infoData = datPtr;
+				}
+				
+				//theApp.m_zipMap[0].totalBytes += zip[index]->m_uUncomprSize;
+				//theApp.m_zipMap[0].fileCount++;
+		//	}
+		}
 	}
 
-	if (cleanup)
+	// now we need to see if there is anything in the zip file not accounted for vs the dat.
+	theApp.m_zipMap[0].it = theApp.m_zipMap[0].ROMmap.begin();
+	while (theApp.m_zipMap[0].it != theApp.m_zipMap[0].ROMmap.end())
 	{
-		// cleanup the .dat map so we can scan it again
-		for (int j = 0; j<theApp.m_datZipList[datPos].fileCount; j++) // ..and for each dat entry
-			theApp.m_datZipList[datPos].ROMsMap[j].status &= STATUS_ROM_PERFECT_MATCH;
+		if ( ((theApp.m_zipMap[0].it->second.status & STATUS_ROM_PERFECT_MATCH) == 0) && ((theApp.m_zipMap[0].it->second.status & STATUS_ROM_MISSING) == 0) )// no .dat record for this one.
+		{
+			romfilenameZip = theApp.m_zipMap[0].it->second.name;
+			theApp.m_zipMap[0].ROMmap[romfilenameZip].status |= STATUS_ROM_EXTRA;	// mark this file as extranious
+			int size = theApp.m_zipMap[0].it->second.size;
+			crcsize = size;
+			crcsize = (unsigned long long)(crcsize << 32);
+			crcsize |= theApp.m_zipMap[0].it->second.crc;
+
+			// is this crc even in the .dat file?
+			//if (theApp.m_crcMap.count(crc) != 0)
+			//{
+			//	//std::vector<unsigned int>::iterator datPtrit;
+			//	//datPtrit = theApp.m_crcMap[crc].datPtr.begin();
+				int datPtr = doesROMExistinDat(crcsize);
+				if (datPtr != -1)
+				{
+					CStringW zipName = theApp.m_datZipList[datPtr].filename; // debug
+					theApp.m_zipMap[0].ROMmap[romfilenameZip].status |= STATUS_ROM_ELSEWHERE;
+					theApp.m_zipMap[0].ROMmap[romfilenameZip].infoData = datPtr;
+				}
+			//}
+		}
+		theApp.m_zipMap[0].it++;
 	}
+
+	// no one is using this option.
+	//if (cleanup)
+	//{
+	//	// cleanup the .dat map so we can scan it again
+	//	for (int j = 0; j<theApp.m_datZipList[datPos].fileCount; j++) // ..and for each dat entry
+	//		theApp.m_datZipList[datPos].ROMsMap[j].status &= STATUS_ROM_PERFECT_MATCH;
+	//}
 }
+
+// is this crc even in the .dat file?
+// returns datPtr if so.
+// returns -1 if not.
+int CDOSCenterDlg::doesROMExistinDat(unsigned long long crcsize)
+{
+	int datPtr = -1;
+	if (theApp.m_crcMap.count(crcsize))
+	{
+		std::vector<unsigned int>::iterator datPtrit;
+		datPtrit = theApp.m_crcMap[crcsize].datPtr.begin();
+		datPtr = *datPtrit;
+	}
+	return datPtr;
+}
+
 
 // checks a given file to see if it should be ignored or not, based on name, file size and crc.
 // returns TRUE if file should be skipped, false if not.
 // database of skippable files is built off the settings and tools->ignore database
+// on entry, filename has already been extracted by the caller
 bool CDOSCenterDlg::skipafile(CStringW filename, CString ext, unsigned int crc, unsigned int fileSize)
 {
 	filename.MakeLower();
 	ext.MakeLower();
-	
+	CStringW fullFilename = filename + L"." + ext;
 	if (theApp.m_ignoreOn == false)
 		return false;
 
-	if ((theApp.m_minFilesize != -1) && (fileSize < theApp.m_minFilesize))
+	if ((theApp.m_ignoreMinFileSize != -1) && (fileSize < theApp.m_ignoreMinFileSize))
 		return true;
 
+	// full filename check, with matching CRC or wildcard.
+	if (theApp.m_ignoreFilename.count(fullFilename) != 0)
+	{
+		if ((theApp.m_ignoreFilename[fullFilename] == crc) || (theApp.m_ignoreFilename[fullFilename] == 0xffffffff))
+			return true;
+	}
+
+	// extension check, with matching CRC or wildcard.
+	if (theApp.m_ignoreExt.count(ext) != 0)
+	{
+		if ((theApp.m_ignoreExt[ext] == crc) || (theApp.m_ignoreExt[ext] == 0xffffffff))
+			return true;
+	}
+
+	if (theApp.m_ignoreName.count(filename) != 0)
+	{
+		if ((theApp.m_ignoreName[filename] == crc) || (theApp.m_ignoreName[filename] == 0xffffffff))
+			return true;
+	}
+
+
+#if 0 // old brute force method going through the array.
 	for (int i=0; i<theApp.m_ignoreTheseCount; i++)
 	{
 		// check for filename or any filename
@@ -3027,6 +2383,7 @@ bool CDOSCenterDlg::skipafile(CStringW filename, CString ext, unsigned int crc, 
 
 		}
 	}
+#endif
 	return false;
 }
 
@@ -3597,14 +2954,17 @@ bool CDOSCenterDlg::add2zip(CStringW zipFilename, CString targetFile, bool store
 }
 
 // replacement for the below, eventually.
-void CDOSCenterDlg::zip2map2(CString zipFilename)
+void CDOSCenterDlg::zip2map2(CStringW zipFilename, bool dontadjustpaths)
 {
 	WORD dosDate;
 	WORD dosTime;
 	ROMdata tempROMdata;
 	CStringW filename;
+	CStringW folder, tmp, ext;
 	CZipArchive zip;
-	ZIP_INDEX_TYPE index;
+	CSettingsandTools CnT;
+	
+	ZIP_INDEX_TYPE index=0;
 
 	
 	if (!zip.Open(zipFilename))
@@ -3617,147 +2977,108 @@ void CDOSCenterDlg::zip2map2(CString zipFilename)
 	
 	theApp.m_zipMap[0].filename = zipFilename;
 	theApp.m_zipMap[0].ROMmap.erase(theApp.m_zipMap[0].ROMmap.begin(), theApp.m_zipMap[0].ROMmap.end());
+	theApp.m_zipMap[0].totalBytes = 0;
+	theApp.m_zipMap[0].skippedFiles = 0;
+	theApp.m_zipMap[0].skippedFilesSize = 0;
+	theApp.m_zipMap[0].fileCount = 0;
+
+	// while we're here, look to see if this zip file is buried.
+	m_buriedZipFolder = L"";
+	folder = zip[index]->GetFileName();
+	if (folder.Find('\\') != -1)
+	{	// ok, first file is inside a folder, get the name of it
+		folder = folder.Left(folder.Find('\\') + 1);
+		// make sure everything else is inside that folder.
+		for (index = 0; index < zip.GetCount(); index++)
+		{
+			tmp = zip[index]->GetFileName();
+			if (tmp.Left(folder.GetLength()) != folder)
+			{
+				folder = L"";
+				break;
+			}
+		}
+		m_buriedZipFolder = folder;
+	}
 
 
-	theApp.m_nFileCount = zip.GetCount();
-	theApp.m_zipMap[0].fileCount = theApp.m_nFileCount;
+
 
 	// for each rom in the actual zip we've just peeked at...
-	// load them into a temporary map so we can check 'em against the .dat
-	for (ZIP_INDEX_TYPE index = 0; index < zip.GetCount(); index++)
-	{
-		// store the roms in a scratch cmap
-		filename = zip[index]->GetFileName();
-		filename.Replace('/', '\\');
-		if (!m_buriedZipFolder.IsEmpty())
-		{
-			filename.Replace(m_buriedZipFolder, L"");
-		}
-
-		dosDate = zip[index]->m_uModDate;
-		dosTime = zip[index]->m_uModTime;
-
-		//FileTimeToDosDateTime((FILETIME*)g, (LPWORD)&dosDate, (LPWORD)&dosTime);
-
-		theApp.m_zipMap[0].ROMmap[filename].name = filename;  // don't even need this, since the filename is the index.
-		theApp.m_zipMap[0].ROMmap[filename].size = zip[index]->m_uUncomprSize; // > m_uLocalUncomprSize;
-		theApp.m_zipMap[0].ROMmap[filename].crc = zip[index]->m_uCrc32;
-		theApp.m_zipMap[0].ROMmap[filename].status = 0;
-		theApp.m_zipMap[0].ROMmap[filename].date = (dosDate << 16) + dosTime;
-
-		// new!
-		//tempROMdata.crc = info.crc;
-		//tempROMdata.date = (dosDate << 16) + dosTime;
-		//tempROMdata.size = info.unc_size;
-		//tempROMdata.status = 0;
-		//tempROMdata.ptr2zipFileArray = i;
-//		theApp.m_ROMsInZip.SetAt(filename, i);
-
-	}
-	zip.Close();
-}
-
-// converts a zip file into a CRC based map
-// only CRCs are examined
-void CDOSCenterDlg::zip2_crcmap(CString zipFilename, DATFILESTRUC &zipMap)
-{
-	WORD dosDate;
-	WORD dosTime;
-	ZIPENTRYW info;
-	CStringW romName;
-	unsigned int crc, size;
-
-	CZipArchive zip;
-	ZIP_INDEX_TYPE index;
-	CSettingsandTools CnT;
-
-	unsigned long long crcsize;
-	unsigned long long collisionCount;
-	
-	if (!zip.Open(zipFilename))
-	{
-		if (!theApp.m_quietmode)
-			AfxMessageBox(L"There's something goofy with this file. - can't open it!\r\n" + zipFilename, MB_ICONWARNING, 0);
-		return;
-	}
-
-	// get number of files in zip
-	zipMap.filename = zipFilename;
-	zipMap.count = zip.GetCount();
-	zipMap.totalBytes = 0;
-
-	
-
-	// for each rom in the actual zip...
 	// load them into a temporary map so we can check 'em against the .dat
 	for (index = 0; index < zip.GetCount(); index++)
 	{
 		// store the roms in a scratch cmap
-		//if (GetZipItemW(m_uz, i, &info) != ZR_OK)
-		//	break;
-		
+		filename = zip[index]->GetFileName();
+		unsigned int crc = zip[index]->m_uCrc32;
+		unsigned int size = zip[index]->m_uUncomprSize;
+		filename.Replace('/', '\\');
 
-		crc = zip[index]->m_uCrc32;
-		size = zip[index]->m_uUncomprSize;
-		zipMap.totalBytes += size;
-		romName = zip[index]->GetFileName();
-		
-		// should I do this?
-		romName.Replace('/', '\\');
-
-		// if CRC is 0, create a fake CRC based off the filename. This allows folders and disk labels to still be uniquely identified.
-		if ((crc == 0) && (size == 0))
-			crc = CnT.hashAString((CT2A)romName, 0);
-
-		
-
-		//! this should maybe be an optional parameter
-		if (!m_buriedZipFolder.IsEmpty())
+		if (!dontadjustpaths)
 		{
-			romName.Replace(m_buriedZipFolder.MakeLower(), L"");
-		}
-		// end
-		
-		crcsize = crc + size;
-		//FileTimeToDosDateTime(&info.ctime, (LPWORD)&dosDate, (LPWORD)&dosTime);
-
-		// check for collisions along the way.		
-		collisionCount = 0;
-		while (zipMap.CRCMap.count(crcsize) == 1)
-		{
-			// CRCsize collision! make a note in the original entry
-			//zipMap.CRCMap[crcsize].status |= NEW_STATUS_COLLISION;
-			// make a new key by simply incrementing a number outside of the possible max value of CRC+size
-			collisionCount++;
-			crcsize &= 0xfffffffff;
-			//zipMap.CRCMap[crcsize].collsionCount = collisionCount;	// update the 1st ROM map entry with the new count
-			crcsize |= (collisionCount << COLLISION_COUNT_START_BIT);
+			if (!m_buriedZipFolder.IsEmpty())
+			{
+				filename.Replace(m_buriedZipFolder, L"");
+			}
 		}
 
-		zipMap.CRCMap[crcsize] = 1;  // just make an entry for this CRC
-		
-		// fresh location to store the ROM info
-//!!		zipMap.CRCMap[crcsize].date = (dosDate << 16) + dosTime;
-		//!!		zipMap.CRCMap[crcsize].crc = crc;
-		//!!zipMap.CRCMap[crcsize].size = size;
-		//!!zipMap.CRCMap[crcsize].name = info.name;
-		//!!zipMap.CRCMap[crcsize].status = 0;
+		// if CRC is 0, create a fake CRC based off the filename. This non-CRCable files to still be uniquely identified.
+		if ((crc == 0))
+		{
+			if (filename.Right(1) == '\\') // is this a folder only?  Skipit.
+			{
+				theApp.m_zipMap[0].skippedFiles++;
+				//theApp.m_zipMap[0].ROMmap[filename].status |= STATUS_ROM_SKIPPED;
+				continue;
+			}
+			tmp = filename;
+			tmp.MakeLower();
+			crc = CnT.hashAString((CT2A)tmp, 0);
+		}
+
+		if (!filename.IsEmpty())
+		{
+			dosDate = zip[index]->m_uModDate;
+			dosTime = zip[index]->m_uModTime;
+
+			//FileTimeToDosDateTime((FILETIME*)g, (LPWORD)&dosDate, (LPWORD)&dosTime);
+			theApp.m_zipMap[0].ROMmap[filename].name = filename;  // don't even need this, since the filename is the index.
+			theApp.m_zipMap[0].ROMmap[filename].size = zip[index]->m_uUncomprSize; // > m_uLocalUncomprSize;
+			theApp.m_zipMap[0].ROMmap[filename].crc = crc;
+			theApp.m_zipMap[0].ROMmap[filename].status = 0;
+			theApp.m_zipMap[0].ROMmap[filename].date = (dosDate << 16) + dosTime;
+			theApp.m_zipMap[0].ROMmap[filename].infoData = 0;
+			theApp.m_zipMap[0].totalBytes += zip[index]->m_uUncomprSize;
+			theApp.m_zipMap[0].fileCount++;
+		}
+
+		// see if this file is to be ignored.
+		tmp = filename;
+		ext = extractExtension(tmp);
+		if (skipafile(tmp, ext, crc, size))
+		{
+			theApp.m_zipMap[0].skippedFiles++;
+			theApp.m_zipMap[0].skippedFilesSize += theApp.m_zipMap[0].ROMmap[filename].size;
+			theApp.m_zipMap[0].ROMmap[filename].status |= STATUS_ROM_IGNORED;
+		}
+
+
 	}
-	zipMap.count = index;
 	zip.Close();
 }
 
-
+// based on the status field in the zipmap, display some hopefully useful information.
 void CDOSCenterDlg::displayZipFileInfoText(void)
 {
 	ROMdata lookupROMdata;		// more temporary storage for the lookup
 	CStringW tmp;
 	CStringW filename;
-	CStringW romName;
+	CStringW romName, ext;
 	int nIndex = -1;
 	int count = 0;
 	int pos;
 	int status = 0;
+	int datPtr;
 	CString s_crc;
 	CString color;
 	
@@ -3774,37 +3095,81 @@ void CDOSCenterDlg::displayZipFileInfoText(void)
 	
 	nIndex = theApp.m_zipDetailsList.GetNextItem(nIndex, LVNI_SELECTED);
 	filename = theApp.m_zipDetailsList.GetItemText(nIndex, 1);
-	filename += L"." + theApp.m_zipDetailsList.GetItemText(nIndex, 2);	// extension
-
+	ext = theApp.m_zipDetailsList.GetItemText(nIndex, 2);	// extension
+	ext.Trim();
+	if (!ext.IsEmpty())
+		filename += L"." + ext;
+	
 	tmp = L"";
 	
-
-	int zipPosPtr = theApp.m_zipMap[0].zipDatPtr;
 	romName = theApp.m_zipMap[0].ROMmap[filename].correctFilename;
 	status = theApp.m_zipMap[0].ROMmap[filename].status;
+	datPtr = theApp.m_zipMap[0].zipDatPtr;
 
-	if (status == 0)
-		tmp = "Unknown file.";
-	//int status = theApp.m_tmpzipList[nIndex].status;
-	if (status & STATUS_ROM_IGNORED)
-		tmp += L"This type of file is in your ignore list.\r";
-	if ((status & (STATUS_CRC_MATCH + STATUS_FILENAME_MATCH)) == STATUS_CRC_MATCH)
-		tmp += L"This filename is incorrect according to the DAT file.\rShould be:" + romName;
-	if ((status & (STATUS_CRC_MATCH + STATUS_FILENAME_MATCH)) == STATUS_FILENAME_MATCH)
+	if ((status & STATUS_ROM_ELSEWHERE) == 0)
+		tmp += "Unknown file.\r\nThe CRC32 of this file does not exist in the entire .dat\r";
+	
+
+	switch (status & STATUS_ROM_PERFECT_MATCH)
 	{
-		tmp += "CRC mismatch for this file. Filename is correct.\r";
-		s_crc.Format(L"%08x", theApp.m_zipMap[0].ROMmap[filename].crc);
-		if (theApp.m_ROMDATEntryCRC.Lookup(s_crc, lookupROMdata))
-		{// CRC hit?
-			theApp.m_datZipListit = theApp.m_datZipList.find(lookupROMdata.ptr2zipFileArray);
-			romName = theApp.m_datZipListit->second.filename;	// 2nd element is the 2nd thing stored in this map. weird stuff.
-			//theApp.m_tmpzipList[i].newFileName = zipName;
-			//theApp.m_tmpzipList[i].ptr2zipFileArray = lookupROMdata.ptr2zipFileArray;
-			//				color = COLOR_PURPLE;
-		}
+		case 0:	// covered above
+			break;
+		case STATUS_CRC_MATCH:			// 1
+		case STATUS_CRC_MATCH + STATUS_TIMESTAMP_MATCH:		// 9
+			tmp += L"This filename is incorrect according to the DAT file.\rShould be:" + romName;
+			break;
+		case STATUS_SIZE_MATCH:			// 02
+		case STATUS_SIZE_MATCH + STATUS_FILENAME_MATCH + STATUS_TIMESTAMP_MATCH:	// 0xe
+			tmp += L"Size matches, but not CRC; file is modified compared to .dat.\r";
+			break;
+		case STATUS_CRC_MATCH + STATUS_SIZE_MATCH:		// 3
+			tmp = L"This file has a CRC+size match, but filename+timestamp are wrong.\rShould be:" + romName;
+			break;
+		case STATUS_FILENAME_MATCH:			// 04
+			tmp += L"Filename matches, but nothing else!\r";
+			break;
+		case STATUS_CRC_MATCH + STATUS_FILENAME_MATCH:	// 5,d - CRC match,but size mismatch.  should be impossible.
+		case STATUS_CRC_MATCH + STATUS_FILENAME_MATCH + STATUS_TIMESTAMP_MATCH:	
+			tmp += L"CRC match, but file size is correct.\rThis should be impossible!\r";
+			break;
+		case STATUS_SIZE_MATCH + STATUS_FILENAME_MATCH:							// 6
+			tmp += L"CRC mismatch for this file.\rFilename and size are correct.\r";
+			tmp += L"File has likely been modified.\r";
+			break;
+		case STATUS_CRC_MATCH + STATUS_SIZE_MATCH + STATUS_FILENAME_MATCH:		// 7
+			tmp = L"Everything except the timestamp is correct.\r";
+			break;
+		case STATUS_TIMESTAMP_MATCH:		// 8
+			tmp = L"Only the timestamp matched the dat!\r";
+			break;
+		case STATUS_TIMESTAMP_MATCH + STATUS_SIZE_MATCH:	// 0xa
+			tmp = L"File has been modified and renamed compared to the .dat file.\r";
+			break;
+		case STATUS_CRC_MATCH + STATUS_SIZE_MATCH + STATUS_TIMESTAMP_MATCH:		// 0xb
+			tmp = L"File has likely been renamed.\rShould be:" + romName;
+			break;
+		case STATUS_TIMESTAMP_MATCH + STATUS_TIMESTAMP_MATCH:	// 0xc
+			tmp = L"Filename correct, size+CRC mismatch\r";
+			break;
+		case STATUS_ROM_PERFECT_MATCH:		// 0xf
+			tmp = L"This file is a perfect match!";
+			break;
 	}
-	if ((status & STATUS_ROM_PERFECT_MATCH) == STATUS_ROM_PERFECT_MATCH)
-		tmp = "This file is a perfect match!";
+
+	//int status = theApp.m_tmpzipList[nIndex].status;
+	if (status & STATUS_ROM_EXTRA)
+	{
+		tmp += L"This file is extra in this zip when compared to the dat.\r\r";
+	}
+	if (status & STATUS_ROM_IGNORED)
+	{
+		tmp += L"This type of file is in your ignore list.\r\r";
+	}
+
+
+
+	// add in tzipcheck
+
 	//if (theApp.m_zipDetailsList.GetItemText(nIndex, COLORCOL) == COLOR_RED_IGNORED)
 	//	tmp += "According to the DAT, this file is missing from the scanned zip, but it's in your ignore list so we don't really care.\r";	
 	//if (theApp.m_zipDetailsList.GetItemText(nIndex, COLORCOL) == COLOR_GREEN_PERFECT)	// could also check status bits
@@ -3812,9 +3177,15 @@ void CDOSCenterDlg::displayZipFileInfoText(void)
 	//if (theApp.m_zipDetailsList.GetItemText(nIndex, COLORCOL) == COLOR_BROWN)
 	//	tmp += "CRC mismatch for this file. Filename is correct.\r";
 
-	if (status & STATUS_ROM_ELSEWHERE)
+	// If this file is found elsewhere in the dat, let the user optionally switch to viewing that .dat entry.
+	// if the file is missing from the zip, don't let the user switch to that dat entry because it makes no sense.
+	if ( (status & STATUS_ROM_ELSEWHERE) && ((status & STATUS_ROM_MISSING) == 0) )
 	{
-		tmp += L"This file is found in a different entry in the DAT:\r\n" + romName + L"\r\nSwitch to this zip?"; // repurposed romname to mean different zip file for this condition
+		int zipPosPtr = theApp.m_zipMap[0].ROMmap[filename].infoData;
+		CStringW entryName = theApp.m_datZipList[zipPosPtr].filename;
+		tmp += L"This file is found in a different entry in the DAT:\r\n" + entryName;
+		
+		tmp += L"\r\nSwitch to this zip?"; // repurposed romname to mean different zip file for this condition
 		int choice = AfxMessageBox(tmp, MB_ICONWARNING | MB_YESNO, 0);
 		if (choice == IDYES)
 		{
@@ -3829,72 +3200,38 @@ void CDOSCenterDlg::displayZipFileInfoText(void)
 				color += L"|" + tmp;
 			}
 			theApp.m_leftSideList.SetItemText(nIndex, COLORCOL, color);
-			theApp.m_leftSideList.SetItemText(nIndex, NEWFILENAMECOL, romName);
+			theApp.m_leftSideList.SetItemText(nIndex, NEWFILENAMECOL, entryName);
 			OnNMDblclkZipFileList(NULL, NULL);
 		}
 		tmp = "";	// avoid the message box below
 	}
 
-	if (theApp.m_tmpzipList[nIndex].status == 0)
-		tmp = "The CRC of this file is not in the DAT.\r\nUnknown file";
+	if ((status & STATUS_ROM_MISSING + STATUS_ROM_ELSEWHERE) == STATUS_ROM_MISSING + STATUS_ROM_ELSEWHERE)
+	{
+		tmp += "This file is missing from this zip.\r";
+		unsigned int size = theApp.m_zipMap[0].ROMmap[filename].size;
+		unsigned long long crcsize = (unsigned long long)(size << 32);
+		crcsize |= theApp.m_zipMap[0].ROMmap[filename].crc;
+		datPtr = doesROMExistinDat(crcsize);
+		if (datPtr != -1)
+		{
+			CStringW f = theApp.m_datZipList[datPtr].filename;
+			int count = theApp.m_crcMap[crcsize].collisionCount;
+			CString txt;
+			txt.Format(L"%d", count);
+			tmp += L"This file exists in at least " + txt;
+			tmp += L" other zips, such as\r";
+			tmp += f;
+		}
+	}
+
+	//change this to looking at status and show where in the dat the file is found.
+	// why am i not using status here?
 	if (theApp.m_zipDetailsList.GetItemText(nIndex, COLORCOL) == COLOR_RED)
-		tmp = "This zip is missing this file.";
+		tmp = "This file is missing from the zip file.\rNo other dat entries for that file found.";
 
 	if (!tmp.IsEmpty())
 		AfxMessageBox(tmp, MB_ICONINFORMATION, 0);
-}
-
-
-// opens a given zip file and populates the global CMAP with the contents
-void CDOSCenterDlg::zip2map(CString zipFilename)
-{
-	WORD dosDate;
-	WORD dosTime;
-	ROMdata tempROMdata;
-	ZIPENTRYW info;
-	CStringW filename;
-    m_uz = NULL;
-
-	m_uz = XOpenZipU((void*)(LPCWSTR)zipFilename, 0, ZIP_FILENAME);
-	if (m_uz == NULL)
-	{
-		if (!theApp.m_quietmode)
-			AfxMessageBox(L"There's something goofy with this file. - can't open it!\r\n"+zipFilename, MB_ICONWARNING, 0);
-		return;
-	}
-	
-	GetZipItemW(m_uz, -1, &info);
-	theApp.m_nFileCount = info.index;
-	// for each rom in the actual zip we've just peeked at...
-	// load them into a temporary map so we can check 'em against the .dat
-	for (int i=0; i<theApp.m_nFileCount; i++)
-	{
-		// store the roms in a scratch cmap
-		if (GetZipItemW(m_uz, i, &info) != ZR_OK)
-			break;
-		filename = info.name;
-		filename.Replace('/','\\');
-		if (!m_buriedZipFolder.IsEmpty())
-		{
-			filename.Replace(m_buriedZipFolder.MakeLower(), L"");
-		}
-		theApp.m_tmpzipList[i].fileName = filename;
-		theApp.m_tmpzipList[i].crc = info.crc;
-		theApp.m_tmpzipList[i].size = info.unc_size;
-		theApp.m_tmpzipList[i].status = 0;
-		FileTimeToDosDateTime(&info.ctime, (LPWORD)&dosDate, (LPWORD)&dosTime);
-		theApp.m_tmpzipList[i].date =  (dosDate << 16) + dosTime;
-
-		// new!
-		//tempROMdata.crc = info.crc;
-		//tempROMdata.date = (dosDate << 16) + dosTime;
-		//tempROMdata.size = info.unc_size;
-		//tempROMdata.status = 0;
-		//tempROMdata.ptr2zipFileArray = i;
-		theApp.m_ROMsInZip.SetAt(filename, i);
-
-	}
-	XCloseZip(m_uz);
 }
 
 
@@ -4844,15 +4181,16 @@ void CDOSCenterDlg::add2datFile()
 // from the right side zip details list, add an entry to the ignore list.
 void CDOSCenterDlg::add2Ignore()
 {
-	CFileStuff fileStuff;
+	//CFileStuff fileStuff;
 	CScoringSetupDlg setupDlg;
-	CString tmp;
+	CString filename, ext, scrc;
 	int pos, nIndex;
-	FILE* outFile;
-	CString fileData;
+	//FILE* outFile;
+	//CString fileData;
 	nIndex= -1;
 	nIndex = theApp.m_zipDetailsList.GetNextItem(nIndex, LVNI_SELECTED);
 
+	// make sure file was loaded- may not need this.
 	pos = theApp.m_ignoreFileData.Find(L"min_filesize = ");
 	if (pos == -1)
 	{
@@ -4862,21 +4200,13 @@ void CDOSCenterDlg::add2Ignore()
 
 	while (1)
 	{
-		tmp = theApp.m_zipDetailsList.GetItemText(nIndex,1);	// filename
-		if (tmp.Find('\\') != -1) 
-			tmp = tmp.Right(tmp.GetLength() - (tmp.ReverseFind('\\')) -1 );
-	
-		theApp.m_ignoreFileData+=tmp+L", ";
-		theApp.m_ignoreFileData+=theApp.m_zipDetailsList.GetItemText(nIndex,2)+L", ";	// ext
-		theApp.m_ignoreFileData+=theApp.m_zipDetailsList.GetItemText(nIndex,5)+L"\r\n";	// crc
-	
-	
-	
-		outFile = fopen(theApp.g_appPath+"\\DCignore.ini","wb");
-		theApp.m_ignoreFileData.Replace(L"\n",L"\r\n");
-		fwrite(theApp.m_ignoreFileData, sizeof( char ), theApp.m_ignoreFileData.GetLength(), outFile );
-		fclose(outFile);
-		
+		filename = theApp.m_zipDetailsList.GetItemText(nIndex,1);	// filename
+		filename = theApp.extractFilenameWOPath(filename);
+		ext = theApp.m_zipDetailsList.GetItemText(nIndex, 2);
+		scrc = theApp.m_zipDetailsList.GetItemText(nIndex, 5);
+
+		setupDlg.addEntry2ignorelist(filename, ext, scrc);
+
 		// point to next item		
 		nIndex = theApp.m_zipDetailsList.GetNextItem(nIndex, LVNI_SELECTED);
 		if (nIndex == -1)
@@ -4884,58 +4214,76 @@ void CDOSCenterDlg::add2Ignore()
 	}
 
 	theApp.m_reloadIgnore = true;
-	setupDlg.populateIgnoreList();
+	//setupDlg.populateIgnoreList();
+	setupDlg.prepIgnoreListForSave();
+	setupDlg.saveIgnoreList();
 }
 
 // user has 2x clicked on a file inside a zip - popup a view dialog and display the contents
 void CDOSCenterDlg::OnNMDblclkZipList(NMHDR *pNMHDR, LRESULT *pResult)
 {
-	hexViewFile();
+	int nIndex;
+	CString filename;
+
+	nIndex = theApp.m_zipDetailsList.GetNextItem(-1, LVNI_SELECTED);
+	if (theApp.m_zipDetailsList.GetItemText(nIndex, COLORCOL) == COLOR_RED)	// don't allow us to 2x click a missing file.
+		return;
+
+	filename = theApp.m_zipDetailsList.GetItemText(nIndex, 1);
+	filename += L"." + theApp.m_zipDetailsList.GetItemText(nIndex, 2);	// extension
+
+	filename.TrimRight(L".");
+
+	extractFileFromZip(m_SourcePath + theApp.m_currentlyTaggedZipFile, filename, theApp.m_tmpWorkingFolder + L"\\tmpfile.xyz");
+	
+	hexViewAFile(theApp.m_tmpWorkingFolder + L"\\tmpfile.xyz", filename);
 }
-void CDOSCenterDlg::hexViewFile()
+
+bool CDOSCenterDlg::extractFileFromZip(CString zipFilename, CString filename, CString targetFilename)
+{
+	// open an existing archive
+	CZipArchive zip;
+	zip.Open(zipFilename);
+	ZIP_INDEX_TYPE index = zip.FindFile(filename);
+	if (index == ZIP_FILE_INDEX_NOT_FOUND)
+	{
+		zip.Close();
+		return false;
+	}
+	// separate out path from file
+	CString path = theApp.extractPathFromFilename(targetFilename);
+	CString tmpfile = theApp.extractFilenameWOPath(targetFilename);
+	zip.ExtractFile(index, path, false, tmpfile); // _T("tmpfile.xyz"));
+	zip.Close();
+	// make sure the file is not set to read-only.
+	SetFileAttributes(targetFilename, GetFileAttributes(targetFilename) & ~FILE_ATTRIBUTE_READONLY);
+
+	return true;
+}
+
+void CDOSCenterDlg::hexViewFile(void)
+{
+	OnNMDblclkZipList(0, 0);
+}
+
+// popup a file viewer for the supplied file. (typically c:\doscenter\temp\tempfile.xyz)
+void CDOSCenterDlg::hexViewAFile(CString filename, CString displayfilename)
 {
 	FILE* inFile;
 	CString fileData;
 	CFileStuff file;
-	CString filename, txt, ascii;
-	CZipArchive zip;
+	CString txt, ascii;
 	CProgressDlg progDlg;
 	CPopupViewerDlg dlg;
 	bool showAscii = true;
 	unsigned int size;
 
-	int nIndex;
-	nIndex = theApp.m_zipDetailsList.GetNextItem(-1, LVNI_SELECTED);
-
-	if (theApp.m_zipDetailsList.GetItemText(nIndex, COLORCOL) == COLOR_RED)	// don't allow us to 2x click a missing file.
-		return;
-
-	filename = theApp.m_zipDetailsList.GetItemText(nIndex,1);
-	filename +=L"."+theApp.m_zipDetailsList.GetItemText(nIndex,2);	// extension
-	
-	filename.TrimRight(L".");
-	//filename.Replace('\\','/');
-
-
-	//filename = theApp.extractFilenameWOPath(filename);
-
-	// open an existing archive
-	zip.Open(m_SourcePath + theApp.m_currentlyTaggedZipFile);
-	ZIP_INDEX_TYPE index = zip.FindFile(filename);
-	if (index == ZIP_FILE_INDEX_NOT_FOUND)
-	{
-		zip.Close();
-		return;
-	}
-	size = zip[index]->m_uUncomprSize;
-	zip.ExtractFile(index, theApp.m_tmpWorkingFolder, false, _T("tmpfile.xyz"));
-	zip.Close();
-
-	// make sure the file is not set to read-only.
-	SetFileAttributes(theApp.m_tmpWorkingFolder + "\\tmpfile.xyz", GetFileAttributes(theApp.m_tmpWorkingFolder + "\\tmpfile.xyz") & ~FILE_ATTRIBUTE_READONLY);
-
 	// now open the file and display it in the popup viewer
-	inFile = fopen((CT2A)(theApp.m_tmpWorkingFolder+L"\\tmpfile.xyz"),"rb");
+	inFile = fopen((CT2A)filename,"rb");
+	fseek(inFile, 0, SEEK_END); // seek to end of file
+	size = ftell(inFile); // get current file pointer
+	fseek(inFile, 0, SEEK_SET); // seek back to beginning of file
+
 	char* buffer = new char[size+1];
 	memset(buffer,0,size+1);
 
@@ -4968,7 +4316,7 @@ void CDOSCenterDlg::hexViewFile()
 		fileData = buffer;
 
 		dlg.m_viewerTxt = fileData;
-		dlg.m_fileNameViewer = filename;
+		dlg.m_fileNameViewer = displayfilename;
 		dlg.DoModal();
 	}
 	else	// hex view - it would be super sweet to be able to exit the strings view in the hex view and come back to the hex viewer.  Since the hex viewer doesn't actually have
@@ -5003,7 +4351,7 @@ void CDOSCenterDlg::hexViewFile()
 		}
 	
 		dlg.m_viewerTxt = fileData;
-		dlg.m_fileNameViewer = filename;
+		dlg.m_fileNameViewer = displayfilename;
 		dlg.DoModal();
 
 		//
@@ -5059,21 +4407,6 @@ void CDOSCenterDlg::OnBnClickedDatquery()
 {
 	datQueryDlg dlg;	
 	dlg.DoModal();
-}
-bool CDOSCenterDlg::is_utf8(const char* string)
-{
-    if (!string)
-        return false;
-
-    const unsigned char * bytes = (const unsigned char *)string;
-
-    while (*bytes != 0x00)
-    {
-        if (*bytes ==0x3f)
-                return true;
-        bytes += 1;
-    }
-	return false;
 }
 
 // moves a ready zip from the working directory into the "home" path + year folder.
@@ -5305,9 +4638,38 @@ void CDOSCenterDlg::addFile2Spam()
 
 // convert a rom (or zip) status field into a displayable color
 // should maybe consider converting this into playing with an uint instead of CString
-CString CDOSCenterDlg::status_to_color(int status)
+// color key chart:
+// black = completely unknown file.
+// red = missing file
+// green = file match.  may be discolored based on timestamp and case (fixable)
+// brown = crc mismatch, filename match.
+// 
+// this routine is seriously fubared.
+CString CDOSCenterDlg::status2color(int status)
 {
 	CString color = COLOR_BLACK;
+
+	if ((status & STATUS_ROM_MISSING + STATUS_ROM_ELSEWHERE) == STATUS_ROM_MISSING + STATUS_ROM_ELSEWHERE)
+	{
+		color = COLOR_MISSING_ELSEWHERE;
+		return color;
+	}
+
+	if (status & STATUS_ROM_MISSING)
+	{
+		color = COLOR_RED;
+		return color;
+	}
+	if (status & STATUS_ROM_ELSEWHERE)
+	{
+		color = COLOR_PURPLE;
+		return color;
+	}
+
+	if ((status & STATUS_ROM_EXTRA + STATUS_ROM_IGNORED) == STATUS_ROM_EXTRA + STATUS_ROM_IGNORED )
+	{
+		return COLOR_GRAY;
+	}
 
 	/*
 	// these are inverted values as calculated here: http://www.drpeterjones.com/colorcalc/
@@ -5341,35 +4703,38 @@ CString CDOSCenterDlg::status_to_color(int status)
 // filename, timestamps, case can all be fixed, but make it less green.
 // a wrong CRC goes yellow/brown.  if located in another dat entry, go purple+brown.
 //
+
 	switch (status & STATUS_ROM_PERFECT_MATCH)
 	{
 	case 0:
 	case STATUS_TIMESTAMP_MATCH:				// timestamp only
-		color = COLOR_BLACK; 					// unknown file
+		color = COLOR_BLACK; 					// completely unknown file
 		break;
 	case STATUS_CRC_MATCH:						// 1
-	case STATUS_CRC_MATCH + STATUS_TIMESTAMP_MATCH: // 9
 	case STATUS_CRC_MATCH + STATUS_SIZE_MATCH + STATUS_TIMESTAMP_MATCH: // b
 		color = COLOR_GREEN2;
+		break;
 	case STATUS_SIZE_MATCH:						// 2
 		color = COLOR_BROWN;
-	case STATUS_CRC_MATCH + STATUS_SIZE_MATCH: 	// 3	is it possible to get a CRC but not size match?
-		color = COLOR_YELLOW;
 		break;
 	case STATUS_FILENAME_MATCH:					// 4
 	case STATUS_FILENAME_MATCH + STATUS_TIMESTAMP_MATCH:	// c
 		color = COLOR_BROWN;
 		break;
 	case 5:		// CRC match, but not size.
+	case STATUS_CRC_MATCH + STATUS_TIMESTAMP_MATCH: // 9
 	case 0xd:
 		color = COLOR_WTF;
+		break;
 	case STATUS_FILENAME_MATCH + STATUS_SIZE_MATCH:// 6	likely a hack or modified known file
 	case STATUS_SIZE_MATCH + STATUS_TIMESTAMP_MATCH: // a
 	case STATUS_FILENAME_MATCH + STATUS_SIZE_MATCH + STATUS_TIMESTAMP_MATCH:	// e
 		color = COLOR_BLUE;
 		break;
 	case STATUS_FILENAME_MATCH + STATUS_CRC_MATCH + STATUS_SIZE_MATCH:	// 07.  probably impossible to get CRC without size.
+	case STATUS_CRC_MATCH + STATUS_SIZE_MATCH: 	// 3	is it possible to get a CRC but not size match?
 		color = COLOR_GREEN3;
+		break;
 	case STATUS_ROM_PERFECT_MATCH:	// 0xf
 		color = COLOR_GREEN_PERFECT;
 		break;
@@ -5387,8 +4752,10 @@ CString CDOSCenterDlg::status_to_color(int status)
 			case STATUS_CRC_MATCH + STATUS_TIMESTAMP_MATCH: // 9
 			case STATUS_CRC_MATCH + STATUS_SIZE_MATCH + STATUS_TIMESTAMP_MATCH: // b
 				color = COLOR_GREEN2;
+				break;
 			case STATUS_SIZE_MATCH:						// 2
 				color = COLOR_BROWN;
+				break;
 			case STATUS_CRC_MATCH + STATUS_SIZE_MATCH: 	// 3	is it possible to get a CRC but not size match?
 				color = COLOR_LGREEN;
 				break;
@@ -5399,6 +4766,7 @@ CString CDOSCenterDlg::status_to_color(int status)
 			case 5:		// CRC match, but not size.
 			case 0xd:
 				color = COLOR_WTF;
+				break;
 			case STATUS_FILENAME_MATCH + STATUS_SIZE_MATCH:// 6	likely a hack or modified known file
 			case STATUS_SIZE_MATCH + STATUS_TIMESTAMP_MATCH: // a
 			case STATUS_FILENAME_MATCH + STATUS_SIZE_MATCH + STATUS_TIMESTAMP_MATCH:	// e
@@ -5410,6 +4778,7 @@ CString CDOSCenterDlg::status_to_color(int status)
 				break;
 			}
 		}
+
 		//		if ((theApp.m_tmpzipList[i].status & STATUS_ROM_PERFECT_MATCH) == STATUS_ROM_PERFECT_MATCH)
 		//			color = COLOR_GREEN_PERFECT;
 		//		else // CRC match, filename mismatch
